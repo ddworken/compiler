@@ -1,0 +1,13 @@
+This directory should contain files to be run by the `input_file_test_suite` in test.ml.
+
+Tests should come in groups of related files:
+- someTest.fdl: the input program to be run
+- someTest.options: if present, options for compiling and running the program, one word per line
+  options are
+  * "valgrind" to run the program with valgrind,
+  * "infer" to run type inference, and
+  * "check" to run typechecking
+
+This will test that the program is *supposed* to fail to compile or run, but currently does not.
+(Ideally, when your compiler works perfectly, this directory should be empty.  For now, it's better
+to document which test cases aren't working as expected.)

@@ -1,0 +1,72 @@
+# This file does not type check, but we need a type on nil thanks to the parser so just fill it in with Any to mark that it is untyped
+type Any = (Int)
+
+def length(l):
+  if l == (nil): 0
+  else:
+    1 + length(l[1 of 2])
+
+def sum(l):
+  let (first, rest) = l in
+    if rest == (nil):
+      first
+    else:
+      first + sum(rest)
+
+def concat(a, b):
+  if a == (nil):
+    b
+  else:
+    let (afirst, arest) = a in
+    (afirst, concat(arest, b))
+
+def reverse(l):
+  let len = length(l) in
+    if len == 0:
+      nil
+    else:
+      let (first, rest) = l in 
+        concat(reverse(rest), (first, (nil)))
+
+def map(l, f):
+  if length(l) == 0: nil 
+  else: 
+    let (first, rest) = l in 
+    (f(first), map(rest, f))
+
+def filter(l, f):
+  if length(l) == 0: nil 
+  else: 
+    let (first, rest) = l in 
+    if f(first):
+      (first, filter(rest, f))
+    else:
+      filter(rest, f)
+
+def is_even(n):
+  if n == 0:
+    true
+  else:
+    if n < 0:
+      false 
+    else:
+      is_even(n - 2)
+  
+def rangeH(n):
+  if n == 0:
+    (0, nil)
+  else:
+    (n, rangeH(n - 1))
+
+def range(n):
+  reverse(rangeH(n))
+
+let foo = range(9) in (
+  print(foo);
+  print(reverse(foo));
+  print(sum(foo));
+  print(length(foo));
+  print(map(foo, (lambda (x): x+1)));
+  print(filter(foo, (lambda (x): is_even(x))));
+  true 
+)

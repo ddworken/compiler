@@ -1,0 +1,1 @@
+let rec foo=(lambda (a): print(a); print(foo); print(bar); if a == 0: 42 else: bar(a)), bar=(lambda (a): foo(a - 1)) in foo(10)

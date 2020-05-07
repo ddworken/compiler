@@ -1,0 +1,7 @@
+let rec 
+  f1 = (lambda (a): print(f1); print(f2); print(f3); f2(a, add1(a))),
+  f2 = (lambda (a,b): print(f1); print(f2); print(f3); f3(a,b,add1(b))), 
+  f3 = (lambda (a,b,c): print(f1); print(f2); print(f3); a+b+c) 
+in 
+  f1(1)
+  

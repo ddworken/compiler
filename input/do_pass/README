@@ -1,0 +1,9 @@
+This directory should contain files to be run by the `input_file_test_suite` in test.ml.
+
+Tests should come in groups of related files:
+- someTest.fdl: the input program to be run
+- someTest.valgrind: if present, run the program using valgrind
+- someTest.out: the (optional) expected output of your program
+
+The .out file's contents will be treated as a substring to check for: if the file is missing,
+then this simply tests that the program runs without crashing.

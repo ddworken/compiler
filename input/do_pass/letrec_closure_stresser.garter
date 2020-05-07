@@ -1,0 +1,5 @@
+let a=1, b=2, c=3 in 
+let rec 
+    lam0=(lambda: 0), 
+    lam1=(lambda (m, n, o): print(m); print(n); print(o); let x=m, y=n, z=o in (print(x); print(y); print(z); print(a); print(b); print(c); print(lam0); print(lam1); 123)) 
+in lam1(-1, -2, -3)

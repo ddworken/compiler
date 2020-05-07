@@ -1,0 +1,60 @@
+# Implementing arith and comparison using just add1, sub1, <=, not, and *-1
+
+def eq(x, y): 
+    if isbool(x) && isbool(y):
+        x == y 
+    else: if isnum(x) && isnum(y):
+        (x <= y) && (y <= x)
+    else:
+        false 
+
+def greater(x, y):
+    if (x >= y) && !(eq(x,y)):
+        true 
+    else:
+        false 
+
+def add(x, y):
+    if eq(y, 0):
+        x
+    else: 
+        if greater(y, 0):
+            add(add1(x), sub1(y))
+        else:
+            add(sub1(x), add1(y))
+
+def flip(x): x * -1
+
+def mul(x, y):
+    if eq(y, 1):
+        x
+    else: if greater(y, 1):
+        add(x, mul(x, sub1(y)))
+    else: if eq(y, 0):
+        0
+    else:
+        flip(mul(x, flip(y)))
+
+def sub(x, y):
+    add(x, flip(y))
+
+let 
+    # 8
+    a=print(add(3,5)), 
+    # -8:
+    b=print(add(-3, -5)), 
+    # 15
+    c=print(mul(5,3)), 
+    # 0
+    d=print(mul(5,0)),
+    # -15
+    e=print(mul(5,-3)),
+    # -15
+    f=print(mul(-5,3)),
+    # 5
+    g=print(sub(8,3)),
+    # 11
+    h=print(sub(8,-3)),
+    # -3
+    i=print(sub(8, 11)) in 
+a+b

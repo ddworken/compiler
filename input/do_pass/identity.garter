@@ -1,0 +1,3 @@
+def identity<'a>(x: 'a) -> 'a: x 
+
+identity<Int>(5): Int 

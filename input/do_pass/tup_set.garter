@@ -1,0 +1,4 @@
+let foo: (Int * Int * Int) = (1, 2, 3) in (
+  foo[0 of 3 := 3];<(Int * Int * Int)>
+  foo[0 of 3]
+): Int

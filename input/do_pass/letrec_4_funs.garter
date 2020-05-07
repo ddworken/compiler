@@ -1,0 +1,6 @@
+let rec
+    f1 = (lambda (a): print(f1); print(f2); print(f3); print(f4); 42),
+    f2 = (lambda (a,b): print(f1); print(f2); print(f3); print(f4); f1(0)),
+    f3 = (lambda (a,b,c): print(f1); print(f2); print(f3); print(f4); f2(0,0)),
+    f4 = (lambda (a,b,c,d): print(f1); print(f2); print(f3); print(f4); f3(0,0,0)) in 
+f4(0,0,0,0)

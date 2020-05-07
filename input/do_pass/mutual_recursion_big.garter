@@ -1,0 +1,25 @@
+def f1(a: Int, b: Int, c: Int, d: Int) -> Int:
+    if a ==<Int> 1:
+        f2(a, b, c, d)
+    else:
+        f1(a - 1, b, c, d)
+
+and def f2(a: Int, b: Int, c: Int, d: Int) -> Int:
+    if b ==<Int> 2:
+        f3(a, b, c, d)
+    else:
+        f2(a, b - 1, c, d)
+
+and def f3(a: Int, b: Int, c: Int, d: Int) -> Int:
+    if c ==<Int> 3:
+        f4(a, b, c, d)
+    else:
+        f3(a, b, c - 1, d)
+
+and def f4(a: Int, b: Int, c: Int, d: Int) -> Int:
+    if d ==<Int> 4:
+        a + b + c + d
+    else:
+        f4(a, b, c, d - 1)
+
+f1(10, 12, 9, 13): Int 

@@ -1,0 +1,4 @@
+type foo<'a, 'b> = ('a * 'b)
+type bar = (foo<Int, Bool> * Int)
+
+((1, true), 3): bar 

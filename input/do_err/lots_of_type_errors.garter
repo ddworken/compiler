@@ -1,0 +1,26 @@
+def foobar1<'a>(x: 'a, y: Int) -> Bool:
+    let a = x in a == y
+
+def foobar2<'a>(x: 'a, y: Int) -> Bool:
+    let a: 'a = x in a ==<'a> y
+
+def foobar3<'a>(x: 'a, y: Int) -> Bool:
+    x ==<Int> y
+
+def seqH<'a, 'b>(a: 'a, b: 'b) -> 'b: b 
+
+def seq<'a, 'b>(a: 'a, b: 'b) -> 'b:
+	seqH<'a, 'b>(print<'a>(a), b)
+
+def iden(x): x 
+
+seq<Int, Int>(
+seq<Int, Int>(
+seq<Int, Int>(
+    iden(3),
+    iden<Int>(5)
+),
+    foobar1<Int>(5, 6)
+), 
+    foobar2<Bool, Bool>(3,2)
+): InexistentType

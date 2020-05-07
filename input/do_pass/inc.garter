@@ -1,0 +1,13 @@
+def make_inc():
+    let mut=(0,), inc=(lambda: let tmp=mut[0 of 1] in (mut[0 of 1 := add1(tmp)]; tmp)) in inc 
+
+let inc = make_inc() in (
+    print(inc());
+    print(inc());
+    print(inc());
+    print(inc());
+    print(inc());
+    print(make_inc()());
+    print(make_inc()());
+    inc()
+)

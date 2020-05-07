@@ -1,0 +1,4 @@
+let Y = (λ (b): (λ (f): b((λ (x): (f(f)(x)))))((λ (f): b((λ (x): (f(f)(x))))))) in 
+let y_fib = Y((λ (fib): (λ (n): if n <= 2: 1 else: fib(n - 1) + fib(n - 2)))) in 
+let rec rec_fib = (lambda (n): if n <= 2: 1 else: rec_fib(n - 1) + rec_fib(n - 2)) in 
+(print(rec_fib(18)); y_fib(18))

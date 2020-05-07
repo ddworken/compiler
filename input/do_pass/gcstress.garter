@@ -1,0 +1,130 @@
+type Any = (Int)
+
+def heap_and_forget(v):
+  let leaked = (v) in
+  (nil)
+
+def n_list(v, n):
+  if n == 0:
+    (nil)
+  else:
+    (v, n_list(v, n - 1))
+
+def retuple(tup):
+  let (a, b) = tup in
+  (a, b)
+
+def dup_list_retupled(l):
+  if l == (nil):
+    nil
+  else:
+    let (first, rest) = l in
+      retuple((first, dup_list_retupled(rest)))
+
+def leak_big_list(v):
+  if v == (nil):
+    (nil)
+  else:
+    let (first, rest) = v in
+    heap_and_forget(first);
+    heap_and_forget(rest);
+    leak_big_list(rest)
+
+let foo1 = n_list(5, 1000) in
+let foo2 = dup_list_retupled(foo1) in
+# This bit here should leak a bunch of things.  Probably could be simpler.
+let bar =
+   (let foo3 = n_list(foo2, 5000) in
+    let foo4 = dup_list_retupled(foo3) in
+    let foo5 = n_list(foo4, 20000) in
+    let foo6 = dup_list_retupled(foo5) in
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    leak_big_list(foo6);
+    foo6) in
+true

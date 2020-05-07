@@ -1,0 +1,22 @@
+def f1(a: Int, b: Int, c: Int) -> Int:
+    if a ==<Int> 0:
+        let _1:Int = print<Int>(-1) in 
+        f2(print<Int>(b), print<Int>(c), print<Int>(a))
+    else: 
+        f1(a - 1, b, c)
+
+and def f2(b: Int, c: Int, a: Int) -> Int:
+    if b ==<Int> 0:
+        let _1:Int = print<Int>(-1) in 
+        f3(print<Int>(c), print<Int>(a), print<Int>(b))
+    else:
+        f2(b - 1, c, a)
+
+and def f3(c: Int, a: Int, b: Int) -> Int:
+    if c ==<Int> 0:
+        let _:Int = print<Int>(-1) in 
+        print<Int>(a) + print<Int>(b) + print<Int>(c)
+    else:
+        f3(c - 1, a, b)
+
+f1(10, 11, 12): Int 

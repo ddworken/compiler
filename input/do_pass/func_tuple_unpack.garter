@@ -1,0 +1,6 @@
+type foo<'a, 'b> = ('a * 'b)
+
+def f<'a, 'b>((x:'a, y: 'b)) -> foo<'b, 'a>:
+  (y, x)
+
+let x: foo<Int, Bool> = (3, false) in f<Int, Bool>(x): foo<Bool, Int>

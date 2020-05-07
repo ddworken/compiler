@@ -1,0 +1,5 @@
+def fact(acc: Int, n: Int) -> Int:
+  if n < 1: acc
+  else: let x: Int=acc*n, y: Int=n - 1, z: Int=fact(x,y) in z
+
+fact(1, 5): Int 

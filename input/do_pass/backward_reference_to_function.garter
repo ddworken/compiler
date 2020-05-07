@@ -1,0 +1,5 @@
+def f(x: Int) -> Int: x
+
+def g(x: Int) -> Int: f(x)
+
+g(2): Int

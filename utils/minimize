@@ -1,0 +1,8 @@
+#!/usr/bin/python3
+
+# Minimize the file in temp.garter (useful for writing tests in test.ml)
+
+with open('input/do_pass/temp.garter') as f:
+	for line in f:
+		print(line.split('#')[0].strip(), end=" ")
+print('')
