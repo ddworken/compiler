@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "string.h"
 
 // The end of the text segment (used for smarter printing)
 extern uint64_t etext;
@@ -32,6 +33,8 @@ void printType(SNAKEVAL v) {
     printf("tuple");
   } else if (is_snake_closure(v)) {
     printf("function");
+  } else if (is_snake_string(v)) {
+    printf("string");
   } else if (is_forwarding_ptr(v)) {
     printf("forward");
   } else {
@@ -99,17 +102,6 @@ void smarter_print_heap_helper(uint64_t *heap, uint64_t *heap_end) {
   }
 }
 
-// // Naively print out everything on the heap assuming it is a snake tagged value (may segfault)
-// void smarter_print_heap_helper(uint64_t *heap, uint64_t *heap_end) {
-//   for (uint64_t i = 0; i < (uint64_t)(heap_end - heap); i += 1) {
-//     printf("  %ld/%p: ", i, (heap + i));
-//     printType(*(heap + i));
-//     printf(":\t");
-//     printHelp(stdout, *(heap + i));
-//     printf("\n");
-//   }
-// }
-
 void smarter_print_heap(uint64_t *from_start, uint64_t *from_end, uint64_t *to_start, uint64_t *to_end) {
   printf("Source heap: \n");
   naive_print_heap(from_start, from_end);
@@ -166,8 +158,9 @@ uint64_t *copy_if_needed(uint64_t *garter_val_addr, uint64_t *heap_top) {
       tag = CLOSURE_TAG;
     } else if (is_snake_tuple(garter_val)) {
       tag = TUPLE_TAG;
+    } else if (is_snake_string(garter_val)) {
+      tag = STRING_TAG;
     } else {
-      // todo: string support
       ice("Found forwarding pointer that pointed to not(closure || tuple)");
     }
 
@@ -183,8 +176,14 @@ uint64_t *copy_if_needed(uint64_t *garter_val_addr, uint64_t *heap_top) {
   } else if (is_snake_closure(garter_val)) {
     uint64_t num_closed_over = *(heap_thing_addr + 2) / 2;
     thing_size = num_closed_over + 3;
+  } else if (is_snake_string(garter_val)) {
+    uint64_t length_of_string = strlen((char*)heap_thing_addr);
+    uint64_t num_bytes = length_of_string + 1;
+    thing_size = (num_bytes / 8);
+    if ((num_bytes % 8) != 0) {
+      thing_size += 1;
+    }
   } else {
-    // todo: string support
     ice("Found not(closure || tuple) when calculating the size of the thing being garbage collected");
   }
 
@@ -221,22 +220,24 @@ uint64_t *copy_if_needed(uint64_t *garter_val_addr, uint64_t *heap_top) {
   } else if (is_snake_closure(garter_val)) {
     // The first sub-item of a closure is at index 3 (after the arity, function pointer, number of closed over items)
     first_sub_elem = 3;
+  } else if (is_snake_string(garter_val)) {
+    // Strings have no sub-elements that need to be copied, so skip over the recursive calls
+    goto done_recursive_copying;
   } else {
-    // todo: string support 
     ice("Found not(tuple || closure) when recursively copying sub-elements!");
   }
   // Recursively call on each sub-item
-  for (uint64_t i = first_sub_elem; i <= thing_size; i++) {
+  for (uint64_t i = first_sub_elem; i < thing_size; i++) {
     uint64_t *item_addr = old_heap_top + i;
-    if (DEBUG && false) {
+    if (DEBUG) {
       printf("Recurring --> ");
-      printHelp(stdout, *item_addr);
+      // printHelp(stdout, *item_addr);
       printf("\n");
     }
     uint64_t *new_heap_top = copy_if_needed(item_addr, heap_top);
     heap_top = align_to_16(new_heap_top);
   }
-
+  done_recursive_copying:
   // (6). Return the updated heap_top
   return heap_top;
 }

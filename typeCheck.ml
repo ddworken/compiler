@@ -29,6 +29,7 @@ let none2int = SForall ([], TyArr ([], tInt, dummy_span), dummy_span)
 let xx2bool = SForall ([ "X" ], TyArr ([ tyVarX; tyVarX ], tBool, dummy_span), dummy_span)
 let string2int = SForall ([], TyArr ([ tString ], tInt, dummy_span), dummy_span)
 let stringint2string = SForall ([], TyArr ([ tString; tInt ], tString, dummy_span), dummy_span)
+let stringstring2string = SForall ([], TyArr ([ tString; tString ], tString, dummy_span), dummy_span)
 
 (* create more type synonyms here, if you need to *)
 let initial_fun_env : funenvt =
@@ -53,6 +54,7 @@ let initial_fun_env : funenvt =
   ; "native#equal", (xx2bool, Native)
   ; "native#string_len", (string2int, Native)
   ; "native#char_at", (stringint2string, Native)
+  ; "native#string_append", (stringstring2string, Native)
   ]
 ;;
 

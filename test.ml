@@ -1354,7 +1354,7 @@ let gc_tests =
       ("(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, "
       ^ "25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49)")
       ""
-      "Error 10: Allocation error: needed 52 words, but the heap is only 24 words"
+      "Error 10: Allocation error: needed 52 words, but the heap is only 28 words"
   ; tgc
       "gc_repeated_deep_mutual_recursion_1"
       (add_space_for_native_functions 12)
@@ -1469,8 +1469,19 @@ let string_tests = [
     te "string_char_at_8" "char_at(\"abc\", -1)" "Error: char_at(abc, -1): Index Out Of Bounds";
     te "string_char_at_9" "char_at(true, 0)" "Error: Expected a string, found: true";
     te "string_char_at_10" "char_at(\"true\", \"1\")" "Type Error: Expected a number, found: \"1\"";
-    tgc "gc_string_in_tuple_1" ( add_space_for_native_functions 4)"(\"abc\"); (1,2)" "" "(1, 2)";
-    tgce "gc_string_in_tuple_2" ( add_space_for_native_functions 3)"(\"abc\"); (1,2)" "" "Error 10: Out of memory: needed 4 words, but only 3 remain after collection"
+    tgc "gc_string_in_tuple_0a" (add_space_for_native_functions 6) "(\"abc\", 1)" "" "(\"abc\", 1)";
+    tgce "gc_string_in_tuple_0b" (add_space_for_native_functions 5) "(\"abc\", 1)" "" "Out of memory: needed 4 words, but only 3 remain after collection";
+    tgc "gc_string_in_tuple_1" ( add_space_for_native_functions 6)"(\"abc\",1); (1,2)" "" "(1, 2)";
+    tgce "gc_string_in_tuple_2" ( add_space_for_native_functions 5)"(\"abc\",1); (1,2)" "" "Error 10: Out of memory: needed 4 words, but only 3 remain after collection";
+    tgc "gc_string_in_tuple_3" ( add_space_for_native_functions 10)"let x=(\"abc\",1) in ((1,2);(1,3);(1,4);x)" "" "(\"abc\", 1)";
+    tgce "gc_string_in_tuple_4" ( add_space_for_native_functions 9)"let x=(\"abc\",1) in ((1,2);(1,3);(1,4);x)" "" "Error 10: Out of memory: needed 4 words, but only 3 remain after collection";
+    t "string_append_1" "string_append(\"abc\", \"def\")" "\"abcdef\"";
+    t "string_append_2" "string_append(\"\", \"\")" "\"\"";
+    t "string_append_3" "string_append(\"\", \"a\")" "\"a\"";
+    t "string_append_4" "string_append(\"b\", \"\")" "\"b\"";
+    t "string_append_5" "string_append(\"aaa\", \"bbbbbbbbb\")" "\"aaabbbbbbbbb\"";
+    te "string_append_6" "string_append(\"aaa\", 1)" "Type Error: Expected a string, found: 1";
+    te "string_append_7" "string_append(true, \"bbbbbbbbb\")" "Type Error: Expected a string, found: true"
 ]
 
 (*

@@ -1695,6 +1695,7 @@ let compile_prog (was_typechecked : bool) (anfed : tag aprogram) : string =
     let prelude =
       "section .text\nextern error\nextern native#print\nextern print_stack\nextern try_gc\n"
       ^ "extern STACK_BOTTOM\nextern STACK_SIZE\nextern native#string_len\nextern native#char_at\n"
+      ^ "extern native#string_append\n"
       ^ "extern native#input\nextern native#equal\nextern HEAP_END\nglobal our_code_starts_here\n"
     in
     (* Postlude for our program that contains labels used for error handling *)

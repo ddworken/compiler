@@ -15,6 +15,7 @@ extern SNAKEVAL input() asm("native#input");
 extern SNAKEVAL string_len(SNAKEVAL val) asm("native#string_len");
 extern SNAKEVAL equal(SNAKEVAL val1, SNAKEVAL val2) asm("native#equal");
 extern SNAKEVAL char_at(SNAKEVAL s_str, SNAKEVAL s_idx) asm("native#char_at");
+extern SNAKEVAL string_append(SNAKEVAL v1, SNAKEVAL v2) asm("native#string_append");
 extern SNAKEVAL print_stack(uint64_t stack[], uint64_t rbp, uint64_t num_args, SNAKEVAL val) asm("print_stack");
 extern uint64_t *try_gc(uint64_t *alloc_ptr, uint64_t amount_needed, uint64_t *first_frame,
                         uint64_t *stack_top) asm("try_gc");
@@ -294,7 +295,7 @@ uint64_t* get_next_avail_heap_slot() {
     return x;
 }
 
-uint64_t* try_gc_runtime(uint64_t bytes_needed) {
+void* try_gc_runtime(uint64_t bytes_needed) {
   if (get_next_avail_heap_slot() + bytes_needed < HEAP_END) {
     return get_next_avail_heap_slot();
   }
@@ -316,7 +317,7 @@ uint64_t* try_gc_runtime(uint64_t bytes_needed) {
   printf("DEBUG: alloc_ptr=%p, bytes_needed=%ld, cur_frame=%p, cur_stack_top=%p\n", alloc_ptr, bytes_needed, cur_frame, cur_stack_top);
   printf("used heap space=%ld\n", ((uint64_t)alloc_ptr) - ((uint64_t)HEAP_BASE));
 
-  return try_gc(alloc_ptr, bytes_needed, cur_frame, cur_stack_top);
+  return (void*)try_gc(alloc_ptr, bytes_needed, cur_frame, cur_stack_top);
 }
 
 void bump_heap_pointer(uint64_t amt) {
@@ -336,7 +337,7 @@ SNAKEVAL char_at(SNAKEVAL s_str, SNAKEVAL s_idx) {
     error(ERR_EXPECTED_NUM, s_idx);
   }
   uint64_t new_string_size = 2; // one for the character, one for the null
-  uint64_t* loc = try_gc_runtime(new_string_size);
+  char* dest = try_gc_runtime(new_string_size);
 
   char* source_string = (char*)untag(s_str);
   int64_t idx = ((int64_t)s_idx) >> 1;
@@ -347,14 +348,30 @@ SNAKEVAL char_at(SNAKEVAL s_str, SNAKEVAL s_idx) {
   exit(-1);
   }
 
-  loc[0] = source_string[idx];
-  loc[1] = 0;
+  dest[0] = source_string[idx];
+  dest[1] = 0;
   bump_heap_pointer(new_string_size);
-  return (((uint64_t)loc) + STRING_TAG);
+  return (((uint64_t)dest) + STRING_TAG);
 }
 
-SNAKEVAL string_append(SNAKEVAL val) {
-  return 0;
+SNAKEVAL string_append(SNAKEVAL v1, SNAKEVAL v2) {
+  if (!is_snake_string(v1)) {
+    error(ERR_EXPECTED_STRING, v1);
+  } 
+  if (!is_snake_string(v2)) {
+    error(ERR_EXPECTED_STRING, v2);
+  } 
+  char* str1 = (char*)untag(v1);
+  char* str2 = (char*)untag(v2);
+  uint64_t new_string_size = strlen(str1) + strlen(str2) + 1;
+  char* dest = try_gc_runtime(new_string_size);
+
+  memcpy(dest, str1, strlen(str1));
+  memcpy(dest + strlen(str1), str2, strlen(str2));
+  dest[new_string_size] = 0;
+
+  bump_heap_pointer(new_string_size);
+  return (((uint64_t)dest) + STRING_TAG);
 }
 
 void error(uint64_t code, SNAKEVAL val) {
