@@ -1,1 +1,7 @@
-print("a\nb")
+exception foo
+
+try {
+    throw foo 
+} catch (foo) {
+    2
+}

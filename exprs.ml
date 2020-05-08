@@ -71,9 +71,12 @@ and 'a expr =
   | EAnnot of 'a expr * 'a typ * 'a
   | ELambda of 'a bind list * 'a expr * 'a
   | ELetRec of 'a binding list * 'a expr * 'a
+  | ETryCatch of 'a expr * string * 'a expr * 'a 
+  | ETryCatchFinally of 'a expr * string * 'a expr * 'a expr * 'a 
+  | EThrow of string * 'a 
 
 type 'a decl = DFun of string * 'a bind list * 'a scheme * 'a expr * 'a
-type 'a tydecl = TyDecl of string * string list option * 'a typ list * 'a
+type 'a tydecl = TyDecl of string * string list option * 'a typ list * 'a | ExceptionDecl of string * 'a 
 type 'a program = Program of 'a tydecl list * 'a decl list list * 'a expr * 'a
 
 type 'a immexpr =
@@ -95,6 +98,8 @@ and 'a cexpr =
   | CSetItem of 'a immexpr * int * 'a immexpr * 'a
   | CLambda of string list * 'a aexpr * 'a
   | CString of string * 'a 
+  | CTryCatch of 'a aexpr * string * 'a aexpr * 'a 
+  | CThrow of string * 'a
 
 and 'a aexpr =
   (* anf expressions *)
@@ -181,6 +186,12 @@ let rec map_tag_E (f : 'a -> 'b) (e : 'a expr) =
     let tag_e1 = map_tag_E f e1 in
     let tag_e2 = map_tag_E f e2 in
     EPrim2 (op, map_opt (map_tag_Ts f) opt_typs, tag_e1, tag_e2, tag_prim)
+  | ETryCatch (e1, n, e2, a) ->
+    let tag_prim = f a in
+    let tag_e1 = map_tag_E f e1 in
+    let tag_e2 = map_tag_E f e2 in
+    ETryCatch (tag_e1, n, tag_e2, tag_prim)
+  | EThrow(n, a) -> EThrow(n, f a)
   | ELet (binds, body, a) ->
     let tag_let = f a in
     let tag_binding (b, e, t) =
@@ -379,6 +390,10 @@ let atag (p : 'a aprogram) : tag aprogram =
     | ACExpr c -> ACExpr (helpC c)
   and helpC (c : 'a cexpr) : tag cexpr =
     match c with
+    | CThrow(n, _) -> CThrow(n, tag ())
+    | CTryCatch(e1, n, e2, _) -> 
+    let t = tag () in 
+    CTryCatch(helpA e1, n, helpA e2, t)
     | CPrim1 (op, e, _) ->
       let prim_tag = tag () in
       CPrim1 (op, helpI e, prim_tag)

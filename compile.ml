@@ -171,6 +171,8 @@ let rename_and_tag (p : tag program) : tag program =
     | ESetItem (e, idx, len, newval, tag) -> ESetItem (helpE env e, idx, len, helpE env newval, tag)
     | EPrim1 (op, typs, arg, tag) -> EPrim1 (op, typs, helpE env arg, tag)
     | EPrim2 (op, typs, left, right, tag) -> EPrim2 (op, typs, helpE env left, helpE env right, tag)
+    | ETryCatch(e1, n, e2, tag) -> ETryCatch(helpE env e1, n, helpE env e2, tag)
+    | EThrow(n, tag) -> EThrow(n, tag)
     | EIf (c, t, f, tag) -> EIf (helpE env c, helpE env t, helpE env f, tag)
     | EString _ | ENumber _ | EBool _ | ENil _ -> e 
     | EId (name, tag) ->
@@ -306,6 +308,8 @@ let anf (p : tag program) : unit aprogram =
       let tup_imm, tup_setup = helpI tup in
       let new_imm, new_setup = helpI newval in
       CSetItem (tup_imm, idx, new_imm, ()), tup_setup @ new_setup
+    | ETryCatch(e1, n, e2, _) -> CTryCatch(helpA e1, n, helpA e2, ()), [] 
+    | EThrow(n, _) -> CThrow(n, ()), [] 
     | _ ->
       let imm, setup = helpI e in
       CImmExpr imm, setup
@@ -336,6 +340,12 @@ let anf (p : tag program) : unit aprogram =
       let tup_imm, tup_setup = helpI tup in
       let new_imm, new_setup = helpI newval in
       ImmId (tmp, ()), tup_setup @ new_setup @ [ BLet (tmp, CSetItem (tup_imm, idx, new_imm, ())) ]
+    | ETryCatch(e1, n, e2, tag) -> 
+      let tmp = sprintf "trycatch_%d" tag in 
+      ImmId(tmp, ()), [ BLet(tmp, CTryCatch(helpA e1, n, helpA e2, ()))]
+    | EThrow(n, tag) -> 
+      let tmp = sprintf "throw_%d" tag in 
+      ImmId(tmp, ()), [BLet(tmp, CThrow(n, ()))]
     | EPrim1 (op, _, arg, tag) ->
       let tmp = sprintf "unary_%d" tag in
       let arg_imm, arg_setup = helpI arg in
@@ -503,6 +513,9 @@ let is_well_formed (p : sourcespan program) : sourcespan program fallible =
     | EId (x, loc) -> if StringMap.mem x env then [] else [ UnboundId (x, loc) ]
     | EPrim1 (_, _, e, _) -> wf_E e env tyenv
     | EPrim2 (_, _, l, r, _) -> wf_E l env tyenv @ wf_E r env tyenv
+    (* TODO: check that the exception being caught actually exists *)
+    | EThrow(n, _) -> [] 
+    | ETryCatch(e1, _, e2, _) -> wf_E e1 env tyenv @ wf_E e2 env tyenv 
     | EIf (c, t, f, _) -> wf_E c env tyenv @ wf_E t env tyenv @ wf_E f env tyenv
     | ELet (bindings, body, _) ->
       let rec find_locs x (binds : 'a bind list) : 'a list =
@@ -703,6 +716,9 @@ let is_well_formed (p : sourcespan program) : sourcespan program fallible =
       in
       let errs = List.flatten (List.map (wf_T tyenv) args) in
       errs, tyenv
+    (* TODO: wf for defined exceptions *)
+    | ExceptionDecl(name, _) -> [], tyenv
+
   in
   match p with
   | Program (tydecls, decls, body, _) ->
@@ -814,6 +830,8 @@ let desugar (p : sourcespan program) : sourcespan program fallible =
     | ELetRec (bindings, body, loc) ->
       let binds = List.map (fun b -> helpBinding b tyenv) bindings in
       ELetRec (List.flatten binds, helpE body tyenv, loc)
+    | ETryCatch(e1, n, e2, loc) -> ETryCatch(helpE e1 tyenv, n, helpE e2 tyenv, loc)
+    | EThrow(n, loc) -> EThrow(n, loc)
   and helpBindsFlatten (tuplebind : string) (binds : sourcespan bind list) (tyenv : sourcespan scheme envt)
       : sourcespan binding list
     =
@@ -863,6 +881,7 @@ let desugar (p : sourcespan program) : sourcespan program fallible =
       let new_tyenv_elem = name, SForall (generics_list, TyTup (List.map (fun t -> expand_t t tyenv) typs, loc), loc) in
       let new_tyenv = new_tyenv_elem :: tyenv in
       generate_init_tyenv rest new_tyenv
+    | ExceptionDecl _ :: rest -> generate_init_tyenv rest tyenv 
     | [] -> tyenv
   and expand_t (t : sourcespan typ) (tyenv : sourcespan scheme envt) : sourcespan typ =
     match t with

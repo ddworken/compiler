@@ -84,6 +84,12 @@ rule token = parse
   | "begin" { BEGIN }
   | "end" { END }
   | "rec" { REC }
+  | "try" { TRY }
+  | "catch" { CATCH }
+  | "finally" { FINALLY }
+  | "exception" { EXCEPTION }
+  | "throw" { THROW }
+  | "yeet" { THROW }
   | tyident as x { TYID (String.sub x 1 (String.length x - 1)) }
   | ident as x { if x = "_" then UNDERSCORE else ID x }
   | eof { EOF }

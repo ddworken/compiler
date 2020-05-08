@@ -150,6 +150,8 @@ and string_of_expr_with (depth : int) (print_a : 'a -> string) (e : 'a expr) : s
      let binds_strs = List.map string_of_bind binds in
      let binds_str = List.fold_left (^) "" (intersperse binds_strs ", ") in
      sprintf "(lam(%s) %s)%s" binds_str (string_of_expr body) (print_a a)
+  | ETryCatch(b, e, c, a) -> sprintf "(try {%s} catch(%s) {%s})%s" (string_of_expr b) e (string_of_expr c) (print_a a)
+  | EThrow (n, a) -> sprintf "(throw %s)%s" n (print_a a)
 
 let string_of_expr (e : 'a expr) : string =
   string_of_expr_with 1000 (fun _ -> "") e
@@ -177,6 +179,7 @@ let string_of_tydecl_with (print_a : 'a -> string) (td : 'a tydecl) : string =
        (ExtString.String.join ", " tyargs)
        (ExtString.String.join " * " (List.map string_of_typ args))
        (print_a a)
+  | ExceptionDecl(name, a) -> sprintf "(exception %s)%s" name (print_a a)
 let string_of_tydecl (td : 'a tydecl) : string =
   string_of_tydecl_with (fun _ -> "") td
 
@@ -234,6 +237,9 @@ and string_of_cexpr_with (depth : int) (print_a : 'a -> string) (c : 'a cexpr) :
   | CLambda(args, body, a) ->
      sprintf "(lam(%s) %s)%s" (ExtString.String.join ", " args) (string_of_aexpr body) (print_a a)
   | CImmExpr i -> string_of_immexpr i
+  | CTryCatch(b, e, c, a) -> sprintf "(try {%s} catch(%s) {%s})%s" (string_of_aexpr b) e (string_of_aexpr c) (print_a a)
+  | CThrow (n, a) -> sprintf "(throw %s)%s" n (print_a a)
+
 and string_of_immexpr_with (print_a : 'a -> string) (i : 'a immexpr) : string =
   match i with
   | ImmNil(a) -> "nil" ^ (print_a a)
