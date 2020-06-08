@@ -1484,6 +1484,23 @@ let string_tests = [
     te "string_append_7" "string_append(true, \"bbbbbbbbb\")" "Type Error: Expected a string, found: true"
 ]
 
+let exn_tests = [
+    t "exn_simple_none_thrown" "exception foo\ntry {print(1)} catch (foo) {print(2)}" "1\n1"
+    ; t "exn_simple_thrown" "exception foo\ntry {print(1); (throw foo); print(2)} catch (foo) {print(3)}" "1\n3\n3"
+    ; te "exn_simple_uncaught" "exception foo\nthrow foo" "Unhandled exception: foo" 
+    ; te "exn_only_catch_matching" "exception foo\nexception bar\ntry { print(1); (throw foo); print(2) } catch (bar) { print(3) }" "Unhandled exception: foo"
+    ; t "exn_binding_in_try" "exception foo\nlet x=1 in try {x} catch (foo) {2}" "1"
+    ; t "exn_binding_in_catch" "exception foo\nlet x=1 in try {throw foo} catch (foo) {x}" "1"
+    ; t "exn_throw_in_catch" "exception foo\nexception bar\ntry { try { print(1); (throw foo); print(2) } catch (foo) { print(3); throw bar } } catch (bar) { print(4) }" "1\n3\n4\n4"
+    ; t "exn_single_closest_handler_1" "exception foo\nexception bar\ntry { try { print(1); (throw foo); print(2) } catch (foo) { print(3) } } catch (foo) { print(4) }" "1\n3\n3"
+    ; t "exn_single_closest_handler_2" "exception foo\nexception bar\ntry { try { print(1); (throw foo); print(2) } catch (bar) { print(3) } } catch (foo) { print(4) }" "1\n4\n4"
+    ; t "exn_handler_nested" "exception foo\n(try {throw foo} catch (foo) {2}) + 3" "5"
+    ; te "exn_uncaught_not_matching" "exception foo\nexception bar\ntry { throw foo } catch (bar) {1}" "Error 16: Unhandled exception: foo"
+    ; te "exn_handler_go_out_of_scope" "exception foo\n(try {1} catch (foo) {2}); (throw foo)" "Error 16: Unhandled exception: foo"
+    ; te "exn_uncaught_in_print" "exception foo\nprint(throw foo)" "Error 16: Unhandled exception: foo"
+    ; t "deeply_nested_handlers" "exception foo\ndef func(n): if n == 0: throw foo else: try { func(n - 1) } catch (foo) { print(n); throw foo }  try { func(10) } catch (foo) { print(123) }" "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n123\n123"
+]
+
 (*
   _    _       _ _     _______        _       
  | |  | |     (_) |   |__   __|      | |      
@@ -1498,6 +1515,7 @@ let misc_unit_tests =
   ; t_any "round_up_to_multiple_of_16_2" (round_up_to_multiple_of_16 8) 16
   ; t_any "round_up_to_multiple_of_16_3" (round_up_to_multiple_of_16 24) 32
   ; t_any "round_up_to_multiple_of_16_4" (round_up_to_multiple_of_16 30) 32
+  ; t_any "range_5" (range 5) [0; 1; 2; 3; 4]
   ]
 ;;
 
@@ -2672,8 +2690,9 @@ let compile_tests =
   @ oom_tests
   @ interpreter_tests
   @ higher_ordered_functions_tests *)
-  @ gc_tests
-  @ string_tests 
+  (* @ gc_tests
+  @ string_tests  *)
+  @ exn_tests 
 ;;
 
 let typecheck_tests =

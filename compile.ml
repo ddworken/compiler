@@ -9,6 +9,9 @@ open TypeCheck
 module StringSet = Set.Make (String)
 module StringMap = Map.Make (String)
 
+(* TODO: don't be a bad person and use a global here: *)
+let global_defined_exns = ref [] 
+
 type 'a sm_envt = 'a StringMap.t
 
 type 'a envt = (string * 'a) list
@@ -104,7 +107,7 @@ let rec find ls x =
   | (y, v) :: rest -> if y = x then v else find rest x
 ;;
 
-(* Returns the numbers from 0 to n (inclusive of 0, exclusive of n) *)
+(* Returns the numbers from 1 to n (inclusive of 1 and n) *)
 let range (n : int) = List.init n (fun x -> x + 1)
 
 let count_vars e =
@@ -963,6 +966,7 @@ let desugar (p : sourcespan program) : sourcespan program fallible =
   in
   match p with
   | Program (tydecls, decls, body, loc) ->
+  global_defined_exns := List.flatten (List.map (fun (d) -> match d with | TyDecl _ -> [] | ExceptionDecl(n, _) -> [n]) tydecls); 
     (try
        let init_tyenv = generate_init_tyenv tydecls [] in
        let body' = desugar_decls_to_lambdas decls body in
@@ -987,6 +991,8 @@ let freevars (e : 'a cexpr) : string list =
     | CSetItem (lhs, _, rhs, _) -> freevars_i lhs known_variables @ freevars_i rhs known_variables
     | CLambda (args, body, _) -> freevars_a body (known_variables @ args)
     | CString _ -> [] 
+    | CTryCatch(e1, n, e2, _) -> freevars_a e1 known_variables @ freevars_a e2 known_variables
+    | CThrow _ -> [] 
   and freevars_a (e : 'a aexpr) (known_variables : string list) : string list =
     match e with
     | ALet (n, v, body, _) -> freevars_c v known_variables @ freevars_a body (n :: known_variables)
@@ -1013,35 +1019,6 @@ let rec set_subtraction (l1 : string list) (l2 : string list) : string list =
   match l1 with
   | f :: rest -> if List.mem f l2 then set_subtraction rest l2 else f :: set_subtraction rest l2
   | [] -> []
-;;
-
-(* Generate the instructions necessary to setup the stack for the given aexpr to run*)
-let generate_stack_setup (e : 'a aexpr) (additional_space : int) (check_stack_space : bool) : instruction list =
-  let num_vars = count_vars e + additional_space in
-  let stack_size = round_up_to_multiple_of_16 (num_vars * word_size) in
-  (if check_stack_space
-  then
-    [ ILineComment "Make sure we have space left on the stack:"
-    ; IMov (Reg reserved_temp_register_1, Reg RBP)
-    ; ISub (Reg reserved_temp_register_1, Const (Int64.of_int stack_size))
-    ; IMov (Reg reserved_temp_register_2, LabelContents "STACK_BOTTOM")
-    ; ISub (Reg reserved_temp_register_2, LabelContents "STACK_SIZE")
-    ; ICmp (Reg reserved_temp_register_1, Reg reserved_temp_register_2)
-    ; CMovle (Reg RSI, Reg reserved_temp_register_1)
-    ; IJle (Label assertion_failed_out_of_stack_memory)
-    ]
-  else [])
-  (* We set up the stack via simply using the IEnter instruction which automatically manages RSP and RBP *)
-  @ [ IEnter (stack_size, 0) ]
-  (* And for debugging purposes we want all the stack registers to be zeroed out, so mov 0 into all of them *)
-  @
-  if stack_size > 0
-  then
-    List.map
-      (fun n ->
-        IInstrComment (IMov (Sized (QWORD_PTR, RegOffset (~-n, RBP)), Sized (QWORD_PTR, Const 0L)), "Zero out the stack"))
-      (range (stack_size / word_size))
-  else []
 ;;
 
 (* Compile the given aexpr to a list of instructions *)
@@ -1076,6 +1053,37 @@ let rec compile_aexpr
   | ASeq (e1, e2, _) ->
     compile_cexpr e1 si env num_args was_typechecked @ compile_aexpr e2 si env num_args was_typechecked
   | ALetRec (_, _, _) -> compile_letrec e si env num_args was_typechecked []
+
+(* Generate the instructions necessary to setup the stack for the given aexpr to run*)
+and generate_stack_setup (e : 'a aexpr) (additional_space : int) (check_stack_space : bool) : instruction list =
+  let num_vars = count_vars e + additional_space in
+  let stack_size = round_up_to_multiple_of_16 (num_vars * word_size) in
+  (if check_stack_space
+  then
+    [ ILineComment "Make sure we have space left on the stack:"
+    ; IMov (Reg reserved_temp_register_1, Reg RBP)
+    ; ISub (Reg reserved_temp_register_1, Const (Int64.of_int stack_size))
+    ; IMov (Reg reserved_temp_register_2, LabelContents "STACK_BOTTOM")
+    ; ISub (Reg reserved_temp_register_2, LabelContents "STACK_SIZE")
+    ; ICmp (Reg reserved_temp_register_1, Reg reserved_temp_register_2)
+    ; CMovle (Reg RSI, Reg reserved_temp_register_1)
+    ; IJle (Label assertion_failed_out_of_stack_memory)
+    ]
+  else [])
+  (* We set up the stack via simply using the IEnter instruction which automatically manages RSP and RBP *)
+  @ [ IEnter (stack_size, 0) ]
+  (* We increment the depth of all the exception handlers so that we can properly unwind the stack when handling
+   * nested exceptions *)
+   @  compile_native_call "increment_exn_depths" []
+  (* And for debugging purposes we want all the stack registers to be zeroed out, so mov 0 into all of them *)
+  @
+  if stack_size > 0
+  then
+    List.map
+      (fun n ->
+        IInstrComment (IMov (Sized (QWORD_PTR, RegOffset (~-n, RBP)), Sized (QWORD_PTR, Const 0L)), "Zero out the stack"))
+      (range (stack_size / word_size))
+  else []
 
 (* Helper method for compiling letrec expressions *)
 and compile_letrec
@@ -1208,8 +1216,14 @@ and compile_lam_helper
                ])
              (free_vars @ reserved_args))
       @ [ ILineComment "} Copy the free variables off the heap onto the stack" ]
+      (* And then compile the actual body *)
       @ compile_aexpr body (List.length (free_vars @ reserved_args) + 1) new_arg_env (List.length args) was_typechecked
-      @ [ ILeave
+      (* After we finish executing the body, we need to decrement our counter of the number of stack frames in order
+       * to properly support unwinding the stack for exceptions *)
+      @ [IMov(Reg reserved_temp_register_1, Reg RAX)]
+      @ compile_native_call "decrement_exn_depths" []
+      @ [ IMov(Reg RAX, Reg reserved_temp_register_1)
+        ; ILeave
         ; IRet
         ; ILineComment (sprintf "} define lambda-%d" tag)
         ; ILabel end_label
@@ -1368,6 +1382,56 @@ and compile_cexpr (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
   | CLambda (args, body, tag) ->
     let code, _, _ = compile_lam_helper e env was_typechecked [] [] None in
     code
+ | CTryCatch (body, exn, catch, tag) ->
+   let catch_start = sprintf "trycatch_start_%d" tag in
+   let catch_end = sprintf "trycatch_end_%d" tag in
+   (* Add this exception handler to the exception handler table before running the body *)
+   compile_native_call "add_to_exn_table" [ compile_exn exn; Label catch_start ]
+   @ compile_aexpr body si env num_args was_typechecked
+   (* After running the body, we stash RAX, clear this exception handler, and restore RAX *)
+   @ [ IMov (Reg reserved_temp_register_1, Reg RAX) ]
+   @ compile_native_call "clear_from_exn_table" [ Label catch_start ]
+   @ [ IMov (Reg RAX, Reg reserved_temp_register_1)
+     (* The body executed without error so jump past the exception handler *)
+     ; IJmp (Label catch_end)
+     ; ILabel catch_start ]
+   (* Before we start executing the exception handler itself, we clear itself from the table
+    * so that exception handlers don't catch exceptions that they themselves throw *) 
+   @ compile_native_call "clear_from_exn_table" [ Label catch_start ]
+   @ compile_aexpr catch si env num_args was_typechecked
+   @ [ ILabel catch_end ]
+
+ | CThrow (exn, tag) ->
+   let done_leaving = sprintf "cthrow_done_leaving_%d" tag in
+   let loop_start = sprintf "cthrow_loop_start_%d" tag in
+   (* Get the depth of the handler by calling into the runtime *) 
+   compile_native_call "get_exn_depth" [ compile_exn exn ]
+   (* A small assembly gadget to `leave` n times *) 
+   @ [ ILabel loop_start
+     ; ICmp (Reg RAX, Const 0L)
+     ; IJe (Label done_leaving)
+     ; ILeave
+     (* After each leave instruction, we need to decrement the depths of all the handlers
+      * to keep the table of depths up to date. Stash RAX so it doesn't get clobbered. *)
+     ; IMov (Reg reserved_temp_register_1, Reg RAX)]
+   @ compile_native_call "decrement_exn_depths" []
+   @ [ IMov (Reg RAX, Reg reserved_temp_register_1)
+     ; ISub (Reg RAX, Const 1L)
+     ; IJmp (Label loop_start)
+     ; ILabel done_leaving
+     ]
+   (* Once we have left enough stack frames, we're almost ready to jump. But before we can
+    * jump we need to clear all of the exception handlers that we are jumping "over". For 
+    * example, if there are two nested exception handlers and we are jumping to the outer
+    * one, we need to clear the inner one to ensure it is no longer in effect. Since we only
+    * ever append to our list of exception handlers, this can be done simply by clearing
+    * all exception handlers from the end of the list to exn. This code lives in the 
+    * runtime. *) 
+   @ compile_native_call "clear_exn_table_before_jmp" [ compile_exn exn ]
+   (* And then finally, we can just jump straight to the exception handler (aka the
+    * "trycatch_start_%d" label from above) and resume execution directly *) 
+   @ compile_native_call "get_exn_location" [ compile_exn exn ]
+   @ [ IJmp (Reg RAX) ]
 
 (* Compile the given immexpr to a list of instructions *)
 and compile_imm (e : tag immexpr) (env : arg envt) : arg =
@@ -1377,6 +1441,13 @@ and compile_imm (e : tag immexpr) (env : arg envt) : arg =
   | ImmBool (false, _) -> const_false
   | ImmId (x, _) -> find env x
   | ImmNil _ -> const_nil
+
+and compile_exn (exn: string) : arg = 
+  let rec find x lst =
+    match lst with
+    | [] -> raise (InternalCompilerError (sprintf "Failed to find exception %s" x))
+    | first :: rest -> if x = first then 0 else 1 + find x rest
+  in Const (Int64.of_int (find exn !global_defined_exns))
 
 (* Compile the given cexpr which must be a prim1 to a list of instructions *)
 and compile_prim1 (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (was_typechecked : bool)
@@ -1711,11 +1782,9 @@ and compile_fun_app (e : tag cexpr) (env : arg envt) (was_typechecked : bool) : 
 let compile_prog (was_typechecked : bool) (anfed : tag aprogram) : string =
   match anfed with
   | AProgram ([], body, _) ->
+    let externs = ["error"; "native#print"; "print_stack"; "try_gc"; "STACK_BOTTOM"; "STACK_SIZE"; "native#string_len"; "native#string_append"; "native#char_at"; "native#input"; "native#equal"; "HEAP_END"; "add_to_exn_table"; "get_exn_depth"; "get_exn_location"; "clear_from_exn_table"; "clear_exn_table_before_jmp"; "increment_exn_depths"; "decrement_exn_depths"] in 
     let prelude =
-      "section .text\nextern error\nextern native#print\nextern print_stack\nextern try_gc\n"
-      ^ "extern STACK_BOTTOM\nextern STACK_SIZE\nextern native#string_len\nextern native#char_at\n"
-      ^ "extern native#string_append\n"
-      ^ "extern native#input\nextern native#equal\nextern HEAP_END\nglobal our_code_starts_here\n"
+      "section .text\nglobal our_code_starts_here\nglobal EXCEPTION_NAMES\n" ^ String.concat "\n" (List.map (fun (x) -> "extern " ^ x) externs)
     in
     (* Postlude for our program that contains labels used for error handling *)
     let postlude =
@@ -1768,7 +1837,8 @@ let compile_prog (was_typechecked : bool) (anfed : tag aprogram) : string =
           , "Assertion failed, tried to call a function with the wrong arity" )
       ; IMov (Reg RDI, Const err_OUT_OF_STACK_MEMORY)
       ; ICall (Label "error")
-      ]
+      ] in 
+    let postlude = postlude @ List.mapi (fun (i) (e) -> StringConstant ((sprintf "exception_%d" i), e)) !global_defined_exns @ [ArrayConstant("EXCEPTION_NAMES", (List.mapi (fun i _ -> sprintf "exception_%d" i)  !global_defined_exns))]
     in
     let all_instructions =
       [ ILabel "our_code_starts_here" ]

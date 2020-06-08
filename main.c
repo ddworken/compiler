@@ -1,4 +1,6 @@
+#include "utils.h"
 #include "gc.h"
+#include "exn.h"
 #include <assert.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -9,7 +11,6 @@
 #include <sys/resource.h>
 
 extern SNAKEVAL our_code_starts_here(uint64_t *HEAP) asm("our_code_starts_here");
-extern void error(uint64_t err_code, SNAKEVAL val) asm("error");
 extern SNAKEVAL print(SNAKEVAL val) asm("native#print");
 extern SNAKEVAL input() asm("native#input");
 extern SNAKEVAL string_len(SNAKEVAL val) asm("native#string_len");
@@ -24,23 +25,6 @@ uint64_t HEAP_SIZE;
 uint64_t *HEAP_BASE;
 uint64_t *HEAP_END;
 uint64_t REMAINING_HEAP_SIZE;
-
-const uint64_t ERR_COMP_NOT_NUM = 1;
-const uint64_t ERR_ARITH_NOT_NUM = 2;
-const uint64_t ERR_LOGIC_NOT_BOOL = 3;
-const uint64_t ERR_IF_NOT_BOOL = 4;
-const uint64_t ERR_OVERFLOW = 5;
-const uint64_t ERR_GET_NOT_TUPLE = 6;
-const uint64_t ERR_GET_LOW_INDEX = 7;
-const uint64_t ERR_GET_HIGH_INDEX = 8;
-const uint64_t ERR_NIL_DEREF = 9;
-const uint64_t ERR_OUT_OF_MEMORY = 10;
-const uint64_t ERR_CALL_NOT_CLOSURE = 11;
-const uint64_t ERR_CALL_ARITY_ERR = 12;
-const uint64_t ERR_OUT_OF_STACK_MEMORY = 13;
-const uint64_t ERR_EXPECTED_STRING = 14;
-const uint64_t ERR_EXPECTED_NUM = 15;
-
 
 uint64_t STACK_BOTTOM;
 // 8MB stack
@@ -374,67 +358,6 @@ SNAKEVAL string_append(SNAKEVAL v1, SNAKEVAL v2) {
   return (((uint64_t)dest) + STRING_TAG);
 }
 
-void error(uint64_t code, SNAKEVAL val) {
-  switch (code) {
-  case ERR_COMP_NOT_NUM:
-    fprintf(stderr, "Type Error: comparison expected a number, found 0x%016lx", val);
-    break;
-  case ERR_ARITH_NOT_NUM:
-    fprintf(stderr, "Type Error: arithmetic expected a number, found 0x%016lx", val);
-    break;
-  case ERR_LOGIC_NOT_BOOL:
-    fprintf(stderr, "Type Error: logic expected a boolean, found 0x%016lx", val);
-    break;
-  case ERR_IF_NOT_BOOL:
-    fprintf(stderr, "Type Error: if expected a boolean, found 0x%016lx", val);
-    break;
-  case ERR_OVERFLOW:
-    fprintf(stderr, "Arithmetic Error: overflow");
-    break;
-  case ERR_GET_NOT_TUPLE:
-    fprintf(stderr, "Type Error: expected tuple, found 0x%016lx", val);
-    break;
-  case ERR_GET_LOW_INDEX:
-    fprintf(stderr, "index too small: %ld", val);
-    break;
-  case ERR_GET_HIGH_INDEX:
-    fprintf(stderr, "index too large: %ld", val);
-    break;
-  case ERR_NIL_DEREF:
-    fprintf(stderr, "Type Error: Attempted to access component of nil");
-    break;
-  case ERR_OUT_OF_MEMORY:
-    fprintf(stderr, "Out of memory: Cannot allocate data of size %ld on the heap", val);
-    break;
-  case ERR_CALL_NOT_CLOSURE:
-    fprintf(stderr, "Error: tried to call a non-function value: ");
-    printHelp(stderr, val);
-    break;
-  case ERR_CALL_ARITY_ERR:
-    fprintf(stderr, "Error: arity mismatch in call, actual arity=%ld\n", val / 2);
-    break;
-  case ERR_OUT_OF_STACK_MEMORY:
-    fprintf(stderr, "Error: Out of stack memory!\n");
-    break;
-  case ERR_EXPECTED_STRING:
-    fprintf(stderr, "Type Error: Expected a string, found: ");
-    printHelp(stderr, val);
-    fprintf(stderr, "\n");
-    break;
-  case ERR_EXPECTED_NUM:
-    fprintf(stderr, "Type Error: Expected a number, found: ");
-    printHelp(stderr, val);
-    fprintf(stderr, "\n");
-    break;
-  default:
-    fprintf(stderr, "Error: Unknown error code: %ld, val: ", code);
-    printHelp(stderr, val);
-  }
-
-  free(HEAP_BASE);
-  exit(code);
-}
-
 /*
   Try to reserve the desired number of bytes of memory, and free garbage if
   needed.  Fail (and exit the program) if there is insufficient memory.  Does
@@ -527,7 +450,10 @@ void configure_stack() {
 }
 
 int main(int argc, char **argv) {
+  // Set up a stack limit so we can detect and handle stack overflows
   configure_stack();
+
+  // Then init our heap with the specified size and align it to 16 bytes
   HEAP_SIZE = 100000;
   if (argc > 1) {
     HEAP_SIZE = atoi(argv[1]);
@@ -549,6 +475,10 @@ int main(int argc, char **argv) {
            (uint64_t)(HEAP_END) - (uint64_t)(HEAP_BASE));
   }
 
+  // Then init our storage for exception handlers
+  EXN_HANDLERS = calloc(sizeof(exn_handler), MAX_EXN_HANDLERS);
+  
+  // Then actually run the code
   SNAKEVAL result = our_code_starts_here(HEAP_BASE);
   if (DEBUG) {
     uint64_t *tmp = 0;

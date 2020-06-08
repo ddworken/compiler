@@ -87,6 +87,8 @@ type instruction =
   | CMove of arg * arg
   | CMovle of arg * arg
   | CMovl of arg * arg
+  | StringConstant of string * string 
+  | ArrayConstant of string * string list 
 
 let r_to_asm (r : reg) : string =
   match r with
@@ -143,17 +145,17 @@ let rec i_to_asm (i : instruction) : string =
   | IMul (dest, to_mul) -> sprintf "  imul %s, %s" (arg_to_asm dest) (arg_to_asm to_mul)
   | ICmp (left, right) -> sprintf "  cmp %s, %s" (arg_to_asm left) (arg_to_asm right)
   | ILabel name -> name ^ ":"
-  | IJo label -> sprintf "  jo near %s" (arg_to_asm label)
-  | IJe label -> sprintf "  je near %s" (arg_to_asm label)
-  | IJne label -> sprintf "  jne near %s" (arg_to_asm label)
-  | IJno label -> sprintf "  jno near %s" (arg_to_asm label)
-  | IJl label -> sprintf "  jl near %s" (arg_to_asm label)
-  | IJle label -> sprintf "  jle near %s" (arg_to_asm label)
-  | IJg label -> sprintf "  jg near %s" (arg_to_asm label)
-  | IJge label -> sprintf "  jge near %s" (arg_to_asm label)
-  | IJmp label -> sprintf "  jmp near %s" (arg_to_asm label)
-  | IJz label -> sprintf "  jz near %s" (arg_to_asm label)
-  | IJnz label -> sprintf "  jnz near %s" (arg_to_asm label)
+  | IJo label -> sprintf "  jo %s" (arg_to_asm label)
+  | IJe label -> sprintf "  je %s" (arg_to_asm label)
+  | IJne label -> sprintf "  jne %s" (arg_to_asm label)
+  | IJno label -> sprintf "  jno %s" (arg_to_asm label)
+  | IJl label -> sprintf "  jl %s" (arg_to_asm label)
+  | IJle label -> sprintf "  jle %s" (arg_to_asm label)
+  | IJg label -> sprintf "  jg %s" (arg_to_asm label)
+  | IJge label -> sprintf "  jge %s" (arg_to_asm label)
+  | IJmp label -> sprintf "  jmp %s" (arg_to_asm label)
+  | IJz label -> sprintf "  jz %s" (arg_to_asm label)
+  | IJnz label -> sprintf "  jnz %s" (arg_to_asm label)
   | IAnd (dest, value) -> sprintf "  and %s, %s" (arg_to_asm dest) (arg_to_asm value)
   | IOr (dest, value) -> sprintf "  or %s, %s" (arg_to_asm dest) (arg_to_asm value)
   | IXor (dest, value) -> sprintf "  xor %s, %s" (arg_to_asm dest) (arg_to_asm value)
@@ -173,6 +175,8 @@ let rec i_to_asm (i : instruction) : string =
   | CMove (a, b) -> sprintf "  cmove %s, %s" (arg_to_asm a) (arg_to_asm b)
   | CMovle (a, b) -> sprintf "  cmovle %s, %s" (arg_to_asm a) (arg_to_asm b)
   | CMovl (a, b) -> sprintf "  cmovl %s, %s" (arg_to_asm a) (arg_to_asm b)
+  | StringConstant(a,b) -> sprintf "%s: db \"%s\", 0" a b 
+  | ArrayConstant(n, l) -> sprintf "%s: dq %s" n (String.concat ", " l)
 ;;
 
 let to_asm (is : instruction list) : string = List.fold_left (fun s i -> sprintf "%s\n%s" s (i_to_asm i)) "" is
