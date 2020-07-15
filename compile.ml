@@ -516,9 +516,10 @@ let is_well_formed (p : sourcespan program) : sourcespan program fallible =
     | EId (x, loc) -> if StringMap.mem x env then [] else [ UnboundId (x, loc) ]
     | EPrim1 (_, _, e, _) -> wf_E e env tyenv
     | EPrim2 (_, _, l, r, _) -> wf_E l env tyenv @ wf_E r env tyenv
-    (* TODO: check that the exception being caught actually exists *)
-    | EThrow(n, _) -> [] 
-    | ETryCatch(e1, _, e2, _) -> wf_E e1 env tyenv @ wf_E e2 env tyenv 
+    | EThrow(n, l) -> if List.mem n !global_defined_exns then [] else [UndefinedException(n, l)] 
+    | ETryCatch(e1, n, e2, l) -> let rec_es = wf_E e1 env tyenv @ wf_E e2 env tyenv in 
+    let exn_es = if List.mem n !global_defined_exns then [] else [UndefinedException(n, l)] in 
+    rec_es @ exn_es
     | EIf (c, t, f, _) -> wf_E c env tyenv @ wf_E t env tyenv @ wf_E f env tyenv
     | ELet (bindings, body, _) ->
       let rec find_locs x (binds : 'a bind list) : 'a list =
@@ -725,6 +726,7 @@ let is_well_formed (p : sourcespan program) : sourcespan program fallible =
   in
   match p with
   | Program (tydecls, decls, body, _) ->
+    global_defined_exns := List.flatten (List.map (fun (d) -> match d with | TyDecl _ -> [] | ExceptionDecl(n, _) -> [n]) tydecls); 
     let initial_env = StringMap.mapi (fun name typ -> get_tag_T typ, None, None) StringMap.empty in
     let initial_env =
       StringMap.fold
@@ -966,7 +968,6 @@ let desugar (p : sourcespan program) : sourcespan program fallible =
   in
   match p with
   | Program (tydecls, decls, body, loc) ->
-  global_defined_exns := List.flatten (List.map (fun (d) -> match d with | TyDecl _ -> [] | ExceptionDecl(n, _) -> [n]) tydecls); 
     (try
        let init_tyenv = generate_init_tyenv tydecls [] in
        let body' = desugar_decls_to_lambdas decls body in

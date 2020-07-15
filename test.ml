@@ -1499,6 +1499,8 @@ let exn_tests = [
     ; te "exn_handler_go_out_of_scope" "exception foo\n(try {1} catch (foo) {2}); (throw foo)" "Error 16: Unhandled exception: foo"
     ; te "exn_uncaught_in_print" "exception foo\nprint(throw foo)" "Error 16: Unhandled exception: foo"
     ; t "deeply_nested_handlers" "exception foo\ndef func(n): if n == 0: throw foo else: try { func(n - 1) } catch (foo) { print(n); throw foo }  try { func(10) } catch (foo) { print(123) }" "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n123\n123"
+    ; te "throw_undefined_exn" "throw foo" "Undefined exception foo used at throw_undefined_exn, 1:0-1:9"
+    ; te "catch_undefined_exn" "try {1} catch (foo) {2}" "Undefined exception foo used at catch_undefined_exn, 1:0-1:23"
 ]
 
 (*

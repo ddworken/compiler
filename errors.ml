@@ -17,6 +17,7 @@ exception OccursCheck of string * sourcespan typ * sourcespan
 exception IndexOutOfBounds of int * int * sourcespan
 exception LetRecNonFunction of sourcespan bind * sourcespan (* name binding, where defined *)
 exception Arity of int * int * sourcespan (* intended arity, actual arity, where called *)
+exception UndefinedException of string * sourcespan (* The undefined exception, where used *)
 
 type reason =
   | InferExp of sourcespan expr
@@ -115,6 +116,7 @@ let print_errors (exns : exn list) : string list =
             (string_of_sourcespan loc) (string_of_typ expected) (string_of_typ actual)
             (ExtString.String.join "\n" (List.map print_reason reasons))
       | IndexOutOfBounds (idx, len, loc) -> sprintf "Tuple indexing at %s is out of bounds (idx=%d, len=%d)" (string_of_sourcespan loc) idx len 
+      | UndefinedException (n, loc) -> sprintf "Undefined exception %s used at %s" n (string_of_sourcespan loc)
       | _ ->
          sprintf "%s" (Printexc.to_string e)
     ) exns
