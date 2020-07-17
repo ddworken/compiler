@@ -21,6 +21,7 @@ type prim2 =
   | Plus
   | Minus
   | Times
+  | Divides 
   | And
   | Or
   | Greater

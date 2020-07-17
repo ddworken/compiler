@@ -89,6 +89,8 @@ type instruction =
   | CMovl of arg * arg
   | StringConstant of string * string 
   | ArrayConstant of string * string list 
+  | ICqo 
+  | IIDiv of arg 
 
 let r_to_asm (r : reg) : string =
   match r with
@@ -177,6 +179,8 @@ let rec i_to_asm (i : instruction) : string =
   | CMovl (a, b) -> sprintf "  cmovl %s, %s" (arg_to_asm a) (arg_to_asm b)
   | StringConstant(a,b) -> sprintf "%s: db \"%s\", 0" a b 
   | ArrayConstant(n, l) -> sprintf "%s: dq %s" n (String.concat ", " l)
+  | ICqo -> "  cqo"
+  | IIDiv(a) -> sprintf "  idiv %s" (arg_to_asm a)
 ;;
 
 let to_asm (is : instruction list) : string = List.fold_left (fun s i -> sprintf "%s\n%s" s (i_to_asm i)) "" is

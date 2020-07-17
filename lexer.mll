@@ -68,6 +68,7 @@ rule token = parse
   | "+" { PLUS }
   | "-" { MINUS }
   | "*" { TIMES }
+  | "/" { DIVIDES }
   | ":=" { COLONEQ }
   | "==" { EQEQ }
   | "<" { LESSNOSPACE }

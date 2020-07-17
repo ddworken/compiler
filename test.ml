@@ -414,6 +414,13 @@ let prim2_arith_tests =
   ; t "add_chained" "1 + 2 + 3" "6"
   ; t "sub_chained" "5 - 3 - 2" "0"
   ; te "num_plus_tuple" "1 + (3,2)" "Type Error: arithmetic expected a number, found"
+  ; t "div_1" "10 / 1" "10"
+  ; t "div_2" "10 / 2" "5"
+  ; t "div_3" "10 / 3" "3"
+  ; t "div_4" "10 / 4" "2"
+  ; t "div_5" "10 / 5" "2"
+  ; t "div_6" "-10 / 5" "-2"
+  ; t "div_6" "-10 / -5" "2"
   ]
 ;;
 

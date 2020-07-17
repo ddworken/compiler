@@ -1534,7 +1534,7 @@ and compile_prim2 (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
     : instruction list
   =
   match e with
-  | CPrim2 (((Plus | Minus | Times) as op), lhs, rhs, tag) ->
+  | CPrim2 (((Plus | Minus | Times | Divides) as op), lhs, rhs, tag) ->
     compile_aexpr lhs si env num_args was_typechecked
     @ [ IMov (Reg reserved_temp_register_1, Reg RAX) ]
     @ compile_assert_is_int (Reg reserved_temp_register_1) assertion_failed_arith_not_num was_typechecked
@@ -1546,6 +1546,14 @@ and compile_prim2 (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
       | Plus -> [ IAdd (Reg RAX, Reg reserved_temp_register_2) ]
       | Minus -> [ ISub (Reg RAX, Reg reserved_temp_register_2) ]
       | Times -> [ ISar (Reg RAX, Const 1L); IMul (Reg RAX, Reg reserved_temp_register_2) ]
+      | Divides -> [
+        ISar(Reg reserved_temp_register_1, Const 1L);
+        ISar(Reg reserved_temp_register_2, Const 1L);
+        IMov(Reg RAX, Reg reserved_temp_register_1);
+        ICqo;
+        IIDiv(Reg reserved_temp_register_2);
+        IShl(Reg RAX, Const 1L)
+      ]
       | err ->
         raise
           (InternalCompilerError
