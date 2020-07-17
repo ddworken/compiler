@@ -726,7 +726,7 @@ let is_well_formed (p : sourcespan program) : sourcespan program fallible =
   in
   match p with
   | Program (tydecls, decls, body, _) ->
-    global_defined_exns := List.flatten (List.map (fun (d) -> match d with | TyDecl _ -> [] | ExceptionDecl(n, _) -> [n]) tydecls); 
+    global_defined_exns := List.flatten (List.map (fun (d) -> match d with | TyDecl _ -> [] | ExceptionDecl(n, _) -> [n]) tydecls) @ ["exn"]; 
     let initial_env = StringMap.mapi (fun name typ -> get_tag_T typ, None, None) StringMap.empty in
     let initial_env =
       StringMap.fold
@@ -1839,7 +1839,7 @@ let compile_prog (was_typechecked : bool) (anfed : tag aprogram) : string =
       ; IMov (Reg RDI, Const err_OUT_OF_STACK_MEMORY)
       ; ICall (Label "error")
       ] in 
-    let postlude = postlude @ List.mapi (fun (i) (e) -> StringConstant ((sprintf "exception_%d" i), e)) !global_defined_exns @ [ArrayConstant("EXCEPTION_NAMES", (List.mapi (fun i _ -> sprintf "exception_%d" i)  !global_defined_exns))]
+    let postlude = (postlude @ List.mapi (fun (i) (e) -> StringConstant ((sprintf "exception_%d" i), e)) !global_defined_exns @ [ArrayConstant("EXCEPTION_NAMES", (List.mapi (fun i _ -> sprintf "exception_%d" i)  !global_defined_exns))]) 
     in
     let all_instructions =
       [ ILabel "our_code_starts_here" ]

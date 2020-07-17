@@ -25,13 +25,7 @@ let ta name program expected = name >:: test_run_anf program name expected
 let te name program expected_err = name >:: test_err ~vg:run_in_valgrind program name expected_err
 let tanf name program expected = name >:: fun _ -> assert_equal expected (anf (tag program)) ~printer:string_of_aprogram
 let teq name actual expected = name >:: fun _ -> assert_equal expected actual ~printer:(fun s -> s)
-let tc name program expected = name >:: my_test_run program name expected ~should_check:true
 
-(* We no longer implement type checking and now our type checker just accepts all code. But, we have all these
- * great type checking tests and it sucks to throw them away. But, going through them manually to change/update
- * them doesn't seem worth it. The passing tc tests will continue to pass. But the error tc tests may or may not 
- * pass. So we just skip the tce tests by making them always pass. *)
-let tce name program expected_err = name >:: fun _ -> ()
 let t_input name program input expected = name >:: my_test_run ~args:[] ~std_input:input program name expected
 
 let te_input name program input expected =
@@ -131,12 +125,6 @@ let simple_tests =
   ; t "-1" "-1" "-1"
   ; t "0" "0" "0"
   ; t "-0" "-0" "0"
-  ; t "valid_type_annotation_1" "4: Int" "4"
-  ; t "valid_type_annotation_2" "4: Bool" "4"
-  ; te
-      "valid_type_annotation_3"
-      "4: FooBar"
-      "The type name FooBar, used at <valid_type_annotation_3, 1:3-1:9>, is not in scope"
   ]
 ;;
 
@@ -173,7 +161,7 @@ let tuple_tests =
       "tup_set_9"
       "let x=(1,2,3) in x[-1 of 3 := false]"
       "Tuple indexing at tup_set_9, 1:17-1:36 is out of bounds (idx=-1, len=3)"
-  ; t "tup_set_10" "let x: (Int * Int) = (1,2) in x[0 of 2 := -1][1 of 2 := -2]: (Int * Int)" "(-1, -2)"
+  ; t "tup_set_10" "let x = (1,2) in x[0 of 2 := -1][1 of 2 := -2]" "(-1, -2)"
   ; t "tup_destruct_1" "let (a, b)=(1, 2) in a" "1"
   ; t "tup_destruct_2" "let (a, b)=(1, 2) in b" "2"
   ; t "tup_destruct_3" "let (a, (b, c), (d, (e, f)))=(1, (2, 3), (4, (5, 6))) in a + b + c + d + e + f" "21"
@@ -190,16 +178,16 @@ let tuple_tests =
 ;;
 
 let nil_tests =
-  [ t "nil_1" "nil: Int" "nil"
-  ; t "nil_2" "(1, 2, (3, (4, nil: Int, nil: Int)))" "(1, 2, (3, (4, nil, nil)))"
-  ; t "nil_3" "(nil: Int, nil: Int)" "(nil, nil)"
-  ; t "nil_4" "let x=(nil: Int) in (x, x)" "(nil, nil)"
-  ; te "nil_5" "1 + nil: Int" "Type Error: arithmetic expected a number, found 0x0000000000000001"
-  ; t "nil_6" "istuple(nil: Int)" "true"
-  ; t "nil_7" "isbool(nil: Int)" "false"
-  ; t "nil_9" "isnum(nil: Int)" "false"
-  ; te "nil_10" "let x=(nil: Bool) in x[0 of 2]" "Type Error: Attempted to access component of nil"
-  ; te "nil_11" "let a=(nil: Bool) in a[0 of 2 := true]" "Type Error: Attempted to access component of nil"
+  [ t "nil_1" "nil" "nil"
+  ; t "nil_2" "(1, 2, (3, (4, nil, nil)))" "(1, 2, (3, (4, nil, nil)))"
+  ; t "nil_3" "(nil, nil)" "(nil, nil)"
+  ; t "nil_4" "let x=(nil) in (x, x)" "(nil, nil)"
+  ; te "nil_5" "1 + nil" "Type Error: arithmetic expected a number, found 0x0000000000000001"
+  ; t "nil_6" "istuple(nil)" "true"
+  ; t "nil_7" "isbool(nil)" "false"
+  ; t "nil_9" "isnum(nil)" "false"
+  ; te "nil_10" "let x=(nil) in x[0 of 2]" "Type Error: Attempted to access component of nil"
+  ; te "nil_11" "let a=(nil) in a[0 of 2 := true]" "Type Error: Attempted to access component of nil"
   ]
 ;;
 
@@ -321,7 +309,7 @@ let input_tests =
       "input(1)"
       "5\n"
       "The function called at <input_13, 1:0-1:8> expected an arity of 0, but received 1 arguments"
-  ; t_input "input_14" "input<Int>()" "true\n" "true"
+  ; t_input "input_14" "input()" "true\n" "true"
   ]
 ;;
 
@@ -335,7 +323,7 @@ let equal_tests =
   ; t "equal_tuple_1" "equal((), ())" "true"
   ; t "equal_tuple_2" "equal((1, 2, 3), (1, 2, 3))" "true"
   ; t "equal_tuple_3" "equal((1, 2, 3), (1, true, 3))" "false"
-  ; t "equal_tuple_4" "equal(nil: Int, nil: Int)" "true"
+  ; t "equal_tuple_4" "equal(nil, nil)" "true"
   ; t "equal_tuple_5" "equal((1, 2), (1, 2, 3))" "false"
   ; t "equal_tuple_6" "equal((1, 2, (5, 2)), (1, 2, (5, 2)))" "true"
   ; t "equal_tuple_7" "equal((1, 2, (5, 2)), (1, 2, (5, (2,))))" "false"
@@ -346,7 +334,7 @@ let equal_tests =
   ; t "equal_diff_type_2" "equal(3, false)" "false"
   ; t "equal_diff_type_3" "equal(true, (true,))" "false"
   ; t "equal_diff_type_4" "equal(-2, (true))" "false"
-  ; t "equal_diff_type_5" "equal(-2, nil: Int)" "false"
+  ; t "equal_diff_type_5" "equal(-2, nil)" "false"
   ; t "equal_diff_type_6" "equal(-2, (lambda: -2))" "false"
   ; te
       "equal_wrong_num_args"
@@ -435,7 +423,7 @@ let sequence_tests =
   ; t "seq_3" "(if true: 5 else: false + 1); 6" "6"
   ; t "seq_4" "if true: 5 else: false + 1; 6" "5"
   ; te "seq_5" "if false: 5 else: (false + 1); 6" "Type Error: arithmetic expected a number, found 0x7fffffffffffffff"
-  ; t "seq_6" "(1;<Int> 2): Int" "2"
+  ; t "seq_6" "(1; 2)" "2"
   ; t "seq_7" "let iden=(lambda (x): x) in iden(print(5);2)" "5\n2"
   ]
 ;;
@@ -556,20 +544,20 @@ let num_comparison_tests =
   ; te "lt_4" "1 < false" "Type Error: comparison expected a number, found 0x7fffffffffffffff"
   ; te "lt_5" "false < 1" "Type Error: comparison expected a number, found 0x7fffffffffffffff"
   ; te "lt_6" "false < true" "Type Error: comparison expected a number, found 0x7fffffffffffffff"
-  ; t "let_lt_1" "let x: Int = 1, y: Int = 2 in x < y" "true"
-  ; t "let_lt_2" "let x: Int=1, y: Int=1 in x < y" "false"
-  ; t "let_lt_3" "let x: Int=1, y: Int=0 in x < y" "false"
+  ; t "let_lt_1" "let x = 1, y = 2 in x < y" "true"
+  ; t "let_lt_2" "let x=1, y=1 in x < y" "false"
+  ; t "let_lt_3" "let x=1, y=0 in x < y" "false"
   ; te
       "let_lt_4"
-      "let x: Int=1, y: Bool=false in x < y"
+      "let x=1, y=false in x < y"
       "Type Error: comparison expected a number, found 0x7fffffffffffffff"
   ; te
       "let_lt_5"
-      "let x: Bool=false, y: Int=2 in x < y"
+      "let x=false, y=2 in x < y"
       "Type Error: comparison expected a number, found 0x7fffffffffffffff"
   ; te
       "let_lt_6"
-      "let x: Bool=false, y: Int=true in x < y"
+      "let x=false, y=true in x < y"
       "Type Error: comparison expected a number, found 0x7fffffffffffffff"
   ; t "lte_1" "1<=2" "true"
   ; t "lte_2" "1<=1" "true"
@@ -686,8 +674,8 @@ let simple_recursive_function_tests =
   ; t "max_rec_3" "def max(a,b): if a>=b: a else: max(b,a)\nmax(3,2)" "3"
   ; t
       "max_rec_4"
-      ("def identity<'a>(x: 'a) -> 'a: x\n"
-      ^ "def max(a: Int, b: Int) -> Int: "
+      ("def identity(x): x\n"
+      ^ "def max(a, b): "
       ^ "   if identity(a) >= identity(b): identity(a) else: identity(max(identity(b),identity(a)))\n"
       ^ "max(3,2)")
       "3"
@@ -1517,53 +1505,6 @@ let misc_unit_tests =
   ; t_any "round_up_to_multiple_of_16_2" (round_up_to_multiple_of_16 8) 16
   ; t_any "round_up_to_multiple_of_16_3" (round_up_to_multiple_of_16 24) 32
   ; t_any "round_up_to_multiple_of_16_4" (round_up_to_multiple_of_16 30) 32
-  ; t_any "range_5" (range 5) [0; 1; 2; 3; 4]
-  ]
-;;
-
-let rename_tests =
-  [ trename
-      "rename_1"
-      "(let x:Int=1 in x)"
-      ("\n\n(let print_4 = (lam(a_10) (*native#print(a_10))), "
-      ^ "input_13 = (lam() (*native#input())), equal_19 = (lam(a_26, b_28) "
-      ^ "(*native#equal(a_26, b_28))) in (let x_32 : Int = 1 in x_32))\n")
-  ; trename
-      "rename_2"
-      "(let x:Int=1 in x) + (let x=2 in x)"
-      ("\n\n(let print_4 = (lam(a_10) (*native#print(a_10))), input_13 = (lam() (*native#input())), "
-      ^ "equal_19 = (lam(a_26, b_28) (*native#equal(a_26, b_28))) in ((let x_33 : Int = 1 in x_33) + "
-      ^ "(let x_39 = 2 in x_39)))\n")
-  ; trename
-      "rename_3"
-      "(let x:Int=1 in (let x:Int=2 in x))"
-      ("\n\n(let print_4 = (lam(a_10) (*native#print(a_10))), input_13 = (lam() (*native#input())), "
-      ^ "equal_19 = (lam(a_26, b_28) (*native#equal(a_26, b_28))) in (let x_32 : Int = 1 in "
-      ^ "(let x_37 : Int = 2 in x_37)))\n")
-  ; trename
-      "rename_4"
-      "(let x:Int=(let x:Int=2 in x) in x)"
-      ("\n\n(let print_4 = (lam(a_10) (*native#print(a_10))), input_13 = (lam() (*native#input())), equal_19 "
-      ^ "= (lam(a_26, b_28) (*native#equal(a_26, b_28))) in (let x_32 : Int = (let x_36 : Int = 2 in x_36) in x_32))\n"
-      )
-  ; trename
-      "rename_5"
-      "(let x:Int=(let x:Int=2 in x) in add1(x))"
-      ("\n\n(let print_4 = (lam(a_10) (*native#print(a_10))), input_13 = (lam() (*native#input())), equal_19 = "
-      ^ "(lam(a_26, b_28) (*native#equal(a_26, b_28))) in (let x_32 : Int = (let x_36 : Int = 2 in x_36) in add1(x_32)))\n"
-      )
-  ; trename
-      "rename_6"
-      "if 0: (let x:Int=1 in x) else: (let y:Int=2 in y)"
-      ("\n\n(let print_4 = (lam(a_10) (*native#print(a_10))), input_13 = (lam() (*native#input())), equal_19 = "
-      ^ "(lam(a_26, b_28) (*native#equal(a_26, b_28))) in (if 0: (let x_34 : Int = 1 in x_34) else: (let y_40 : Int = "
-      ^ "2 in y_40)))\n")
-  ; trename
-      "rename_7"
-      "def f<'a>(x: 'a) -> 'a: x\ndef g(x: Int) -> Int: (let x:Int=1 in x)+x\nf(1)+g(2)"
-      ("\n\n(let print_4 = (lam(a_10) (*native#print(a_10))), input_13 = (lam() (*native#input())), equal_19 = "
-      ^ "(lam(a_26, b_28) (*native#equal(a_26, b_28))) in (let-rec f_32 = (lam(x_36 : 'a) x_36) in (let-rec g_40 = "
-      ^ "(lam(x_51 : Int) ((let x_46 : Int = 1 in x_46) + x_51)) in ((f_32(1)) + (g_40(2))))))\n")
   ]
 ;;
 
@@ -1649,9 +1590,7 @@ let parser_tests =
   ; te "parse_error_26" "(3)(1)" "Error: tried to call a non-function value: 3"
   ; te "parse_error_27" "true(1)" "Error: tried to call a non-function value: true"
   ; te "parse_error_28" "add1(1, 2)" "Parse error at line 1, col 7"
-  ; te "parse_error_29" "5: NotAType" " type name NotAType, used at <parse_error_29, 1:3-1:11>, is not in scope"
-  ; t "parse_error_30" "(5: Int) + 5:Int" "10"
-  ; te "parse_error_31" "def f<'a>(x: 'a): x\nf(2)" "Parse error at line 1, col 17"
+  ; t "parse_error_30" "(5) + 5" "10"
   ; te "parse_func_shadow_add1" "def add1(x): x\nadd1(2)" "Parse error at line 1, col 8"
   ; te "parse_func_shadow_sub1" "def sub1(x): x\nsub1(2)" "Parse error at line 1, col 8"
   ; te "parse_func_shadow_isnum" "def isnum(x): x\nisnum(2)" "Parse error at line 1, col 9"
@@ -1659,15 +1598,6 @@ let parser_tests =
   ; t "parse_func_shadow_print" "def print(x): x\nprint(2)" "2"
   ; te "parse_func_shadow_printstack" "def printStack(x): x\nprintStack(2)" "Parse error at line 1, col 14"
   ; te "parse_func_shadow_+" "def +(x): x\n+(2)" "Parse error at line 1, col 5"
-  ; te
-      "parse_concrete_type_as_generic_typevar_1"
-      "def func<Int>(x: Int) -> Int: x\nfunc(2): Int"
-      "Parse error at line 1, col 12"
-  ; te
-      "parse_concrete_type_as_generic_typevar_1"
-      "def func<a>(x: Int) -> Int: x\nfunc(2): Int"
-      "Parse error at line 1, col 10"
-  ; te "parse_empty_generic_list" "def f<'a>(x: 'a) -> 'a: x\nf<>(1): Int" "Parse error at line 2, col 3"
   ; te "parse_prim1_as_val" "let x=add1 in x(5)" "Parse error at line 1, col 13"
   ]
 ;;
@@ -1699,7 +1629,7 @@ let interpreter_tests =
   ; ti "interpret_11" "(1, 2, (4, true))" "(1, 2, (4, true))"
   ; ti "interpret_12" "let x=((2, 3), 2, 3) in x[0 of 3]" "(2, 3)"
   ; ti "interpret_13" "let x=((2, 3), 2, 3) in x[0 of 3 := true]" "(true, 2, 3)"
-  ; ti "interpret_14" "(1, (2, (3, nil: Int)))" "(1, (2, (3, nil)))"
+  ; ti "interpret_14" "(1, (2, (3, nil)))" "(1, (2, (3, nil)))"
   ; ti "interpret_15" "let x=(1,2), y=(1,2) in x == y" "false"
   ; ti "interpret_16" "let x=(1,2), y=(1,2) in equal(x,y)" "true"
   ; ti "interpret_17" "let x=(1,2), y=x in x==y" "true"
@@ -1845,175 +1775,6 @@ let well_formed_failures =
   ]
 ;;
 
-let anf_tests =
-  [ tanfs
-      "tanf_expand_let_1"
-      "let a=1 in 2"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in "
-      ^ "(alet equal = (lam(a, b) (*native#equal(a, b))) in (alet a = 1 in 2))))\n")
-  ; tanfs
-      "tanf_expand_let_2"
-      "let a=1 in (let b=a in 2)"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in "
-      ^ "(alet equal = (lam(a, b) (*native#equal(a, b))) in (alet a = 1 in (alet b = a in 2)))))\n")
-  ; tanfs
-      "tanf_expand_let_3"
-      "let a=1,b=a,c=b in c"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in "
-      ^ "(alet equal = (lam(a, b) (*native#equal(a, b))) in "
-      ^ "(alet a = 1 in (alet b = a in (alet c = b in c))))))\n")
-  ; tanfs
-      "tanf_expand_let_4"
-      "if 0: 0 else: 2 * (let a=2, b=a, c=3 in (let a=4 in b*c))"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) "
-      ^ "in (alet equal = (lam(a, b) (*native#equal(a, b))) in (if 0: 0 else: (alet a = 2 in (alet "
-      ^ "b = a in (alet c = 3 in (alet a = 4 in (alet binop_53 = (b * c) in (2 * binop_53))))))))))\n")
-  ; tanfs
-      "tanf_expand_let_s_3"
-      "let a=(let b = 1 in b) in a"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in (alet "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in (alet b = 1 in (alet a = b in a)))))\n")
-  ; tanfs
-      "tanf_expand_let_s_4"
-      "(let x=1 in x) + (let x=2 in x)"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in (alet "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in (alet x = 1 in (alet x = 2 in (x + x))))))\n")
-  ; tanfs
-      "tanf_prim1_1"
-      "add1(2)"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in (alet "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in add1(2))))\n")
-  ; tanfs
-      "tanf_prim1_2"
-      "add1(let x=1 in x)"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in (alet "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in (alet x = 1 in add1(x)))))\n")
-  ; tanfs
-      "tanf_prim1_3"
-      "let x = 1 in add1(x)"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in (alet "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in (alet x = 1 in add1(x)))))\n")
-  ; tanfs
-      "tanf_prim2_1"
-      "1 + 2"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in (alet "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in (1 + 2))))\n")
-  ; tanfs
-      "tanf_prim2_2"
-      "(let x=0 in x) + (let x=1 in x)"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in (alet "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in (alet x = 0 in (alet x = 1 in (x + x))))))\n")
-  ; tanfs
-      "tanf_prim2_3"
-      "let x=1,y=2 in x+y"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in (alet "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in (alet x = 1 in (alet y = 2 in (x + y))))))\n")
-  ; tanfs
-      "tanf_num_1"
-      "2"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in (alet "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in 2)))\n")
-  ; tanfs
-      "tanf_num_2"
-      "-2"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in (alet "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in -2)))\n")
-  ; tanfs
-      "tanf_if_lecture_notes_example"
-      "(let x = (if 0: 5 + 5 else: 6 * 2) in (let y = (if 1: x * 3 else: x + 5) in 0))"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in (alet "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in (alet x = (if 0: (5 + 5) else: (6 * 2)) in (alet y = (if 1: (x * "
-      ^ "3) else: (x + 5)) in 0)))))\n")
-  ; tanfs
-      "tanf_short_circuit_1"
-      "print(1) || print(2)"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in (alet "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in ((?print(1)) || (?print(2))))))\n")
-  ; tanfs
-      "tanf_short_circuit_2"
-      "print(1) && print(2)"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in (alet "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in ((?print(1)) && (?print(2))))))\n")
-  ; tanfs
-      "tanf_func_1"
-      "def fib(n: Int) -> Int: if n <= 2: 1 else: fib(n - 1) + fib(n - 2)\nfib(10)"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) "
-      ^ "in (alet equal = (lam(a, b) (*native#equal(a, b))) in (aletrec fib = (lam(n) (alet "
-      ^ "binop_36 = (n <= 2) in (if binop_36: 1 else: (alet binop_42 = (n - 1) in (alet app_41 "
-      ^ "= (?fib(binop_42)) in (alet binop_47 = (n - 2) in (alet app_46 = (?fib(binop_47)) in "
-      ^ "(app_41 + app_46)))))))) in (?fib(10))))))\n")
-  ; tanfs
-      "tanf_func_2"
-      "def fib(n: Int) -> Int: if n <= 2: 1 else: fib(n - 1) + fib(n - 2)\nfib(10)"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() "
-      ^ "(*native#input())) in (alet equal = (lam(a, b) (*native#equal(a, b))) in (aletrec "
-      ^ "fib = (lam(n) (alet binop_36 = (n <= 2) in (if binop_36: 1 else: (alet binop_42 = "
-      ^ "(n - 1) in (alet app_41 = (?fib(binop_42)) in (alet binop_47 = (n - 2) in (alet "
-      ^ "app_46 = (?fib(binop_47)) in (app_41 + app_46)))))))) in (?fib(10))))))\n")
-  ; tanfs
-      "tanf_tuple_1"
-      "(1, 2)"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in (alet "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in (1, 2))))\n")
-  ; tanfs
-      "tanf_tuple_2"
-      "(1, (true, (-2,)))"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in (alet "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in (alet tup_34 = (-2) in (alet tup_32 = (true, tup_34) "
-      ^ "in (1, tup_32))))))\n")
-  ; tanfs
-      "tanf_tuple_3"
-      "let x=(1,2) in (x, x)"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in (alet "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in (alet x = (1, 2) in (x, x)))))\n")
-  ; tanfs
-      "tanf_tuple_4"
-      "let x=(1,2) in x[0 of 2]"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in (alet "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in (alet x = (1, 2) in x[0]))))\n")
-  ; tanfs
-      "tanf_tuple_5"
-      "let x=(1,2) in x[0 of 2 := 5]"
-      ("\n(alet print = (lam(a) (*native#print(a))) in (alet input = (lam() (*native#input())) in (alet "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in (alet x = (1, 2) in x[0 := 5]))))\n")
-  ]
-;;
-
-let desugar_tests =
-  [ tdesugar
-      "desugar_1"
-      "1;<Int> 2"
-      ("\n\n(let print = (lam(a) (*native#print(a))), input = (lam() (*native#input())), "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in (let _ = 1 in 2))\n")
-  ; tdesugar
-      "desugar_2"
-      "let x: (Int * (Int * Bool)) = (1, (2, true)), (a:Int, (b:Int, c:Bool))=x in a+b"
-      ("\n\n(let print = (lam(a) (*native#print(a))), input = (lam() (*native#input())), "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in (let x : (Int * (Int * Bool)) = "
-      ^ "(1, (2, true)), a : Int = x[0 of 2], x_1 : (Int * Bool) = x[1 of 2], b : Int "
-      ^ "= x_1[0 of 2], c : Bool = x_1[1 of 2] in (a + b)))\n")
-  ; tdesugar
-      "desugar_3"
-      "def f((x, y)): x+y\nf((1,2))"
-      ("\n\n(let print = (lam(a) (*native#print(a))), input = (lam() (*native#input())), "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in (let-rec f = (lam(gen#untuple_arg_1 : "
-      ^ "(<BLANK> * <BLANK>)) (let x = gen#untuple_arg_1[0 of 2], y = gen#untuple_arg_1[1 "
-      ^ "of 2] in (x + y))) in (?f((1, 2)))))\n")
-  ; tdesugar
-      "desugar_4"
-      "def f(x): x\nand def g(x): x\nf(2)"
-      ("\n\n(let print = (lam(a) (*native#print(a))), input = (lam() (*native#input())), "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in (let-rec f = (lam(x) x), g = "
-      ^ "(lam(x) x) in (?f(2))))\n")
-  ; tdesugar
-      "desugar_5"
-      "let rec f=(lambda (x): print(x); 1) in f(3)"
-      ("\n\n(let print = (lam(a) (*native#print(a))), input = (lam() (*native#input())), "
-      ^ "equal = (lam(a, b) (*native#equal(a, b))) in (let-rec f = (lam(x) "
-      ^ "(let _ = (?print(x)) in 1)) in (?f(3))))\n")
-  ]
-;;
-
 let freevars_tests =
   [ t_freevars "freevars_1" "(lambda: x)" [ "x" ]
   ; t_freevars "freevars_2" "(lambda: x + x + y)" [ "x"; "y" ]
@@ -2031,654 +1792,19 @@ let freevars_tests =
   ]
 ;;
 
-(*
-  _______                  _____ _               _             
- |__   __|                / ____| |             | |            
-    | |_   _ _ __   ___  | |    | |__   ___  ___| | _____ _ __ 
-    | | | | | '_ \ / _ \ | |    | '_ \ / _ \/ __| |/ / _ \ '__|
-    | | |_| | |_) |  __/ | |____| | | |  __/ (__|   <  __/ |   
-    |_|\__, | .__/ \___|  \_____|_| |_|\___|\___|_|\_\___|_|   
-        __/ | |                                                
-       |___/|_|                                                
-*)
-
-let tc_simple_tests =
-  [ tc "tc_lone_int" "40: Int" "40"
-  ; tce "tc_int_as_bool" "1: Bool" "Type error at tc_int_as_bool, 1:0-1:1: expected Bool but got Int"
-  ; tc "tc_lone_bool" "true: Bool" "true"
-  ; tce "tc_bool_as_int" "true: Int" "Type error at tc_bool_as_int, 1:0-1:4: expected Int but got Bool"
-  ; tce "unannotated_body_1" "5" "The program body at <unannotated_body_1, 1:0-1:1> has no type defined"
-  ; tce "unannotated_body_2" "true" "The program body at <unannotated_body_2, 1:0-1:4> has no type defined"
-  ; tce "bogus_type" "5: FooBar" "The type name FooBar, used at <bogus_type, 1:3-1:9>, is not in scope"
-  ]
-;;
-
-let tc_prim1_tests =
-  [ tc "tc_add1_1" "add1(1): Int" "2"
-  ; tce "tc_add1_2" "add1(true): Int" "Type error at tc_add1_2, 1:5-1:9: expected Int but got Bool"
-  ; tce "tc_add1_3" "add1(1): Bool" "Type error at tc_add1_3, 1:0-1:7: expected Bool but got Int"
-  ; tce
-      "tc_add1_4"
-      "add1(true): Bool"
-      ("Type error at tc_add1_4, 1:0-1:10: expected Bool but got Int\n"
-      ^ "Type error at tc_add1_4, 1:5-1:9: expected Int but got Bool")
-  ; tc "tc_sub1_1" "sub1(1): Int" "0"
-  ; tce "tc_sub1_2" "sub1(true): Int" "Type error at tc_sub1_2, 1:5-1:9: expected Int but got Bool"
-  ; tce "tc_sub1_3" "sub1(1): Bool" "Type error at tc_sub1_3, 1:0-1:7: expected Bool but got Int"
-  ; tce
-      "tc_sub1_4"
-      "sub1(true): Bool"
-      ("Type error at tc_sub1_4, 1:0-1:10: expected Bool but got Int\n"
-      ^ "Type error at tc_sub1_4, 1:5-1:9: expected Int but got Bool")
-  ; tc "tc_print_1" "print<Int>(1): Int" "1\n1"
-  ; tc "tc_print_2" "print<Bool>(true): Bool" "true\ntrue"
-  ; tce "tc_print_3" "print<Bool>(1): Bool" "Type error at tc_print_3, 1:12-1:13: expected Bool but got Int"
-  ; tce "tc_print_4" "print<Int>(false): Int" "Type error at tc_print_4, 1:11-1:16: expected Int but got Bool"
-  ; tce "tc_print_5" "print<Bool>(false): Int" "Type error at tc_print_5, 1:0-1:18: expected Int but got Bool"
-  ; tce
-      "tc_print_6"
-      "print(false): Bool"
-      "The function print, called at tc_print_6, 1:0-1:12, expected 1 type arguments but only 0 types provided"
-  ; tc "tc_isbool_1" "isbool<Int>(5): Bool" "false"
-  ; tc "tc_isbool_2" "isbool<Bool>(false): Bool" "true"
-  ; tce "tc_isbool_3" "isbool<Bool>(1): Bool" "Type error at tc_isbool_3, 1:13-1:14: expected Bool but got Int"
-  ; tce "tc_isbool_4" "isbool<Int>(true): Bool" "Type error at tc_isbool_4, 1:12-1:16: expected Int but got Bool"
-  ; tce
-      "tc_isbool_5"
-      "isbool<Int>(true): Int"
-      ("Type error at tc_isbool_5, 1:0-1:17: expected Int but got Bool\n"
-      ^ "Type error at tc_isbool_5, 1:12-1:16: expected Int but got Bool")
-  ; tc "tc_isnum_1" "isnum<Int>(5): Bool" "true"
-  ; tc "tc_isnum_2" "isnum<Bool>(false): Bool" "false"
-  ; tce "tc_isnum_3" "isnum<Bool>(1): Bool" "Type error at tc_isnum_3, 1:12-1:13: expected Bool but got Int"
-  ; tce "tc_isnum_4" "isnum<Int>(true): Bool" "Type error at tc_isnum_4, 1:11-1:15: expected Int but got Bool"
-  ; tce
-      "tc_isnum_5"
-      "isnum<Int>(true): Int"
-      ("Type error at tc_isnum_5, 1:0-1:16: expected Int but got Bool\n"
-      ^ "Type error at tc_isnum_5, 1:11-1:15: expected Int but got Bool")
-  ; tc "tc_not_1" "!(true): Bool" "false"
-  ; tc "tc_not_2" "!(false): Bool" "true"
-  ; tce "tc_not_3" "!(3): Bool" "Type error at tc_not_3, 1:2-1:3: expected Bool but got Int"
-  ; tce "tc_not_4" "let x:Int=3 in !(x): Bool" "Type error at tc_not_4, 1:17-1:18: expected Bool but got Int"
-  ; tce
-      "tc_not_5"
-      "!(5): Int"
-      ("Type error at tc_not_5, 1:0-1:4: expected Int but got Bool\n"
-      ^ "Type error at tc_not_5, 1:2-1:3: expected Bool but got Int")
-  ]
-;;
-
-let tc_prim2_tests =
-  [ tc "tc_plus_1" "1 + 1: Int" "2"
-  ; tc "tc_plus_2" "1 + 3: Int" "4"
-  ; tce "tc_plus_3" "1 + 2: Bool" "Type error at tc_plus_3, 1:0-1:5: expected Bool but got Int"
-  ; tce "tc_plus_4" "1 + false: Int" "Type error at tc_plus_4, 1:4-1:9: expected Int but got Bool"
-  ; tce "tc_plus_5" "true + 2: Int" "Type error at tc_plus_5, 1:0-1:4: expected Int but got Bool"
-  ; tc "tc_minus_1" "1 - 1: Int" "0"
-  ; tc "tc_minus_2" "1 - 3: Int" "-2"
-  ; tce "tc_minus_3" "1 - 2: Bool" "Type error at tc_minus_3, 1:0-1:5: expected Bool but got Int"
-  ; tce "tc_minus_4" "1 - false: Int" "Type error at tc_minus_4, 1:4-1:9: expected Int but got Bool"
-  ; tce "tc_minus_5" "true - 2: Int" "Type error at tc_minus_5, 1:0-1:4: expected Int but got Bool"
-  ; tc "tc_mult_1" "1 * 1: Int" "1"
-  ; tc "tc_mult_2" "1 * 3: Int" "3"
-  ; tce "tc_mult_3" "1 * 2: Bool" "Type error at tc_mult_3, 1:0-1:5: expected Bool but got Int"
-  ; tce "tc_mult_4" "1 * false: Int" "Type error at tc_mult_4, 1:4-1:9: expected Int but got Bool"
-  ; tce "tc_mult_5" "true * 2: Int" "Type error at tc_mult_5, 1:0-1:4: expected Int but got Bool"
-  ; tc "tc_and_1" "true && true: Bool" "true"
-  ; tc "tc_and_2" "true && false: Bool" "false"
-  ; tce "tc_and_3" "true && 1: Bool" "Type error at tc_and_3, 1:8-1:9: expected Bool but got Int"
-  ; tce "tc_and_4" "3 && false: Bool" "Type error at tc_and_4, 1:0-1:1: expected Bool but got Int"
-  ; tce "tc_and_5" "true && false: Int" "Type error at tc_and_5, 1:0-1:13: expected Int but got Bool"
-  ; tc "tc_or_1" "true || false: Bool" "true"
-  ; tc "tc_or_2" "false || false: Bool" "false"
-  ; tce "tc_or_3" "true || 1: Bool" "Type error at tc_or_3, 1:8-1:9: expected Bool but got Int"
-  ; tce "tc_or_4" "3 || false: Bool" "Type error at tc_or_4, 1:0-1:1: expected Bool but got Int"
-  ; tce "tc_or_5" "true || false: Int" "Type error at tc_or_5, 1:0-1:13: expected Int but got Bool"
-  ; tc "tc_gt_1" "1 > 2: Bool" "false"
-  ; tc "tc_gt_2" "3 > 2: Bool" "true"
-  ; tce "tc_gt_3" "3 > false: Bool" "Type error at tc_gt_3, 1:4-1:9: expected Int but got Bool"
-  ; tce "tc_gt_4" "true > 5: Bool" "Type error at tc_gt_4, 1:0-1:4: expected Int but got Bool"
-  ; tce "tc_gt_5" "3 > 5: Int" "Type error at tc_gt_5, 1:0-1:5: expected Int but got Bool"
-  ; tc "tc_gte_1" "1 >= 2: Bool" "false"
-  ; tc "tc_gte_2" "2 >= 2: Bool" "true"
-  ; tce "tc_gte_3" "3 >= false: Bool" "Type error at tc_gte_3, 1:5-1:10: expected Int but got Bool"
-  ; tce "tc_gte_4" "true >= 5: Bool" "Type error at tc_gte_4, 1:0-1:4: expected Int but got Bool"
-  ; tce "tc_gte_5" "3 >= 5: Int" "Type error at tc_gte_5, 1:0-1:6: expected Int but got Bool"
-  ; tc "tc_lt_1" "1 < 2: Bool" "true"
-  ; tc "tc_lt_2" "3 < 2: Bool" "false"
-  ; tce "tc_lt_3" "3 < false: Bool" "Type error at tc_lt_3, 1:4-1:9: expected Int but got Bool"
-  ; tce "tc_lt_4" "true < 5: Bool" "Type error at tc_lt_4, 1:0-1:4: expected Int but got Bool"
-  ; tce "tc_lt_5" "3 < 5: Int" "Type error at tc_lt_5, 1:0-1:5: expected Int but got Bool"
-  ; tce
-      "tc_lt_with_type"
-      "3 <<Int> 5: Bool"
-      "The function <, called at tc_lt_with_type, 1:0-1:10, expected 0 type arguments but only 1 types provided"
-  ; tc "tc_lte_1" "3 <= 2: Bool" "false"
-  ; tc "tc_lte_2" "2 <= 2: Bool" "true"
-  ; tce "tc_lte_3" "3 <= false: Bool" "Type error at tc_lte_3, 1:5-1:10: expected Int but got Bool"
-  ; tce "tc_lte_4" "true <= 5: Bool" "Type error at tc_lte_4, 1:0-1:4: expected Int but got Bool"
-  ; tce "tc_lte_5" "3 <= 5: Int" "Type error at tc_lte_5, 1:0-1:6: expected Int but got Bool"
-  ; tc "tc_eq_int_1" "(1 ==<Int> 2): Bool" "false"
-  ; tc "tc_eq_int_2" "(1 ==<Int> 1): Bool" "true"
-  ; tc "tc_eq_bool_1" "(true ==<Bool> false):Bool" "false"
-  ; tc "tc_eq_bool_2" "(true ==<Bool> true):Bool" "true"
-  ; tc "tc_eq_bool_3" "(false ==<Bool> true):Bool" "false"
-  ; tce "tc_eq_err_1" "(true ==<Bool> 1):Bool" "Type error at tc_eq_err_1, 1:15-1:16: expected Bool but got Int"
-  ; tce "tc_eq_err_2" "(true ==<Int> 1):Bool" "Type error at tc_eq_err_2, 1:1-1:5: expected Int but got Bool"
-  ; tce
-      "tc_eq_err_3"
-      "(true == true): Bool"
-      "The function ==, called at tc_eq_err_3, 1:1-1:13, expected 1 type arguments but only 0 types provided"
-  ; tce "tc_eq_err_4" "(true ==<Bool> true): Int" "Type error at tc_eq_err_4, 1:1-1:19: expected Int but got Bool"
-  ]
-;;
-
-let tc_if_tests =
-  [ tc "tc_if_1" "(if true: 1 else: 2): Int" "1"
-  ; tc "tc_if_2" "if false: true else: false: Bool" "false"
-  ; tce "tc_if_3" "if true: 1 else: false: Int" "Type error at tc_if_3, 1:17-1:22: expected Int but got Bool"
-  ; tce "tc_if_4" "if false: false else: 3: Int" "Type error at tc_if_4, 1:10-1:15: expected Int but got Bool"
-  ; tce "tc_if_5" "if true: 1 else: false: Bool" "Type error at tc_if_5, 1:9-1:10: expected Bool but got Int"
-  ; tce "tc_if_6" "if false: false else: 3: Bool" "Type error at tc_if_6, 1:22-1:23: expected Bool but got Int"
-  ]
-;;
-
-let tc_sequence_tests =
-  [ tc "tc_seq_1" "1;<Int> 2: Int" "2"
-  ; tc "tc_seq_2" "true;<Bool> 2: Int" "2"
-  ; tce "tc_seq_3" "1;<Bool> 2: Int" "Type error at tc_seq_3, 1:0-1:1: expected Bool but got Int"
-  ; tc "tc_seq_4" "1;<Int> true: Bool" "true"
-  ; tce "tc_seq_5" "1;<Int> 3: Bool" "Type error at tc_seq_5, 1:8-1:9: expected Bool but got Int"
-  ; tc "tc_seq_6" "print<Int>(1);<Int> print<Bool>(true): Bool" "1\ntrue\ntrue"
-  ; tce "tc_seq_7" "1; 2: Int" "The variable _ at <tc_seq_7, 1:0-1:4> has no type defined"
-  ]
-;;
-
-let tc_annot_tests =
-  [ tc "tc_annot_1" "(if true: 5 else: 7): Int" "5"
-  ; tce "tc_annot_2" "(if true: (7: Bool) else: 8): Int" "Type Annotation did not match expected type"
-  ; t_any
-      "tc_annot_3"
-      (is_okay
-         (type_check
-            (Program
-               ( []
-               , [ [] ]
-               , EAnnot
-                   ( EIf
-                       ( EBool (true, dummy_span)
-                       , EAnnot (ENumber (7L, dummy_span), tInt, dummy_span)
-                       , ENumber (8L, dummy_span)
-                       , dummy_span )
-                   , tInt
-                   , dummy_span )
-               , dummy_span ))))
-      true
-  ]
-;;
-
-let tc_let_tests =
-  [ tc "tc_let_1" "let x:Int=1 in 2: Int" "2"
-  ; tc "tc_let_2" "let x:Int=1 in x: Int" "1"
-  ; tc "tc_let_3" "let x:Int=1, y:Int=3 in x+y: Int" "4"
-  ; tce "tc_let_4" "let x:Int=1, y:Int=false in x+y: Int" "Type error at tc_let_4, 1:19-1:24: expected Int but got Bool"
-  ; tce
-      "tc_let_5"
-      "let x:Int=1, y:Bool=false in x+y: Int"
-      "Type error at tc_let_5, 1:31-1:32: expected Int but got Bool"
-  ; tc "tc_let_6" "let x:Int=1, y:Bool=false in (let x:Bool=true in x || y): Bool" "true"
-  ; tc "tc_let_7" "let x:Int=1, y:Int=(3+4) in (let x:Int=7 in x + y) + x: Int" "15"
-  ; tce
-      "tc_let_8"
-      "let x:Bool=true, y:Int=(3+4) in (let x:Int=7 in x + y) + x: Int"
-      "Type error at tc_let_8, 1:57-1:58: expected Int but got Bool"
-  ; tce "tc_let_9" "let x=1 in 1: Int" "The variable x at <tc_let_9, 1:4-1:5> has no type defined"
-  ; tc "tc_let_10" "let x:Int = 1, y:Int=x, z:Int=x+y in z:Int" "2"
-  ]
-;;
-
-let tc_func_tests =
-  [ tc "tc_simple_func_1" "def f() -> Int: 1\nf(): Int" "1"
-  ; tc "tc_simple_func_2" "def f(x: Int) -> Int: x\nf(2): Int" "2"
-  ; tce
-      "tc_simple_func_3"
-      "def f(x: Int) -> Int: x\nf(2): Bool"
-      "Type error at tc_simple_func_3, 2:0-2:4: expected Bool but got Int"
-  ; tce
-      "tc_simple_func_4"
-      "def f(x: Int) -> Int: false\nf(2): Int"
-      "Type error at tc_simple_func_4, 1:22-1:27: expected Int but got Bool"
-  ; tc "tc_fib_1" "def fib(x: Int) -> Int: (if x <= 2: 1 else: fib(x - 1) + fib(x - 2))\nfib(10): Int" "55"
-  ; tce
-      "tc_missing_return_type_1"
-      "def f(x: Int): x\n1: Int"
-      "The function f at <tc_missing_return_type_1, 1:0-1:16> has no type defined"
-  ; tce
-      "tc_missing_return_type"
-      "def fib(x: Int): (if x <= 2: 1 else: fib(x - 1) + fib(x - 2))\nfib(10): Int"
-      ("Type error at tc_missing_return_type, 2:0-2:7: expected Int but got <BLANK>\n"
-      ^ "The function fib at <tc_missing_return_type, 1:0-1:61> has no type defined")
-  ; tce
-      "tc_missing_arg_type"
-      "def f(x) -> Int: 1\nf(2): Int"
-      ("Type error at tc_missing_arg_type, 2:2-2:3: expected <BLANK> but got Int\n"
-      ^ "The variable x at <tc_missing_arg_type, 1:6-1:7> has no type defined")
-  ; tc
-      "tc_mutual_recursion"
-      "def foo(a: Int) -> Int: if a ==<Int> 0: 42 else: bar(a)\nand def bar(a: Int) -> Int: foo(a - 1)\nfoo(10): Int"
-      "42"
-  ; tc "tc_generic_identity_1" "def iden<'a>(x: 'a) -> 'a: x\niden<Int>(5): Int" "5"
-  ; tc "tc_generic_identity_2" "def iden<'a>(x: 'a) -> 'a: x\niden<Bool>(true): Bool" "true"
-  ; tce
-      "tc_generic_1"
-      "def iden<'a>(x: 'a) -> 'a: 1\niden<Bool>(true): Bool"
-      "Type error at tc_generic_1, 1:27-1:28: expected 'a but got Int"
-  ; tc "tc_generic_print" "def f<'a>(x: 'a) -> 'a: print<'a>(x)\nf<Int>(2): Int" "2\n2"
-  ; tce
-      "tc_wrong_number_generics_1"
-      "def f(x: Int) -> Int: x\nf<Int>(2): Int"
-      ("The function f, called at tc_wrong_number_generics_1, 2:0-2:9, expected 0 type arguments but only 1 "
-      ^ "types provided")
-  ; tce
-      "tc_wrong_number_generics_2"
-      "def f<'a>(x: 'a) -> 'a: x\nf(2): Int"
-      ("The function f, called at tc_wrong_number_generics_2, 2:0-2:4, expected 1 type arguments but only 0 "
-      ^ "types provided")
-  ; tce
-      "tc_wrong_number_generics_3"
-      "def f<'a>(x: 'a) -> 'a: x\nf<Int, Bool>(2): Int"
-      ("The function f, called at tc_wrong_number_generics_3, 2:0-2:15, expected 1 type arguments but only 2 "
-      ^ "types provided")
-  ; tce
-      "tc_wrong_number_generics_4"
-      "1 == 2: Bool"
-      ("The function ==, called at tc_wrong_number_generics_4, 1:0-1:6, expected 1 type arguments but only 0 "
-      ^ "types provided")
-  ; tce
-      "tc_wrong_number_generics_5"
-      "print(2): Int"
-      ("The function print, called at tc_wrong_number_generics_5, 1:0-1:8, expected 1 type arguments but only 0 types "
-      ^ "provided")
-  ; tce
-      "tc_unbound_generic"
-      "print<'a>(5): Int"
-      ("Type error at tc_unbound_generic, 1:0-1:12: expected Int but got 'a\n"
-      ^ "Type error at tc_unbound_generic, 1:10-1:11: expected 'a but got Int")
-  ; tc
-      "tc_lots_of_generics_1"
-      "def f<'a, 'c>(a: 'a, b: 'a, c: 'c) -> 'c: if a ==<'a> b: print<'c>(c) else: c\nf<Bool, Int>(true, true, 3): Int"
-      "3\n3"
-  ; tc
-      "tc_lots_of_generics_2"
-      "def f<'a, 'c>(a: 'a, b: 'a, c: 'c) -> 'c: if a ==<'a> b: print<'c>(c) else: c\nf<Int, Bool>(4, 4, false): Bool"
-      "false\nfalse"
-  ; tc
-      "tc_lots_of_generics_3"
-      "def f<'a, 'c>(a: 'a, b: 'a, c: 'c) -> 'c: if a ==<'a> b: print<'c>(c) else: c\nf<Int, Bool>(4, 5, false): Bool"
-      "false"
-  ; tc "tc_reuse_generic_name_1" "def f1<'a>(x: 'a) -> 'a: x\ndef f2<'a>(x: 'a) -> 'a: f1<'a>(x)\nf2<Int>(3): Int" "3"
-  ; tc
-      "tc_reuse_generic_name_2"
-      "def f1<'a>(x: 'a) -> 'a: x\nand def f2<'a>(x: 'a) -> 'a: f1<'a>(x)\nf2<Int>(3): Int"
-      "3"
-  ; tc "tc_func_call_in_func_call_1" "def iden<'a>(x: 'a) -> 'a: x\niden<Int>(iden<Int>(iden<Int>(3))):Int" "3"
-  ; tce
-      "tc_func_call_in_func_call_2"
-      "def bIden(b: Bool) -> Bool: b\ndef iden<'a>(x: 'a) -> 'a: bIden(x)\niden<Int>(iden<Int>(iden<Int>(3))):Int"
-      ("Type error at tc_func_call_in_func_call_2, 2:27-2:35: expected 'a but got Bool\n"
-      ^ "Type error at tc_func_call_in_func_call_2, 2:33-2:34: expected Bool but got 'a")
-  ; tce
-      "tc_generic_is_not_concrete"
-      "def f<'a>(x: 'a) -> Bool: 3 ==<Int> x\nf<Int>(3): Bool"
-      "Type error at tc_generic_is_not_concrete, 1:36-1:37: expected Int but got 'a"
-  ; tc
-      "tc_func_mix_generic_and_concrete_1"
-      "def f<'a>(a: 'a, b: 'a, y: Int, z: Int) -> 'a: if y ==<Int> z: a else: b\nf<Bool>(true, false, 3, 3): Bool"
-      "true"
-  ; tc
-      "tc_func_mix_generic_and_concrete_2"
-      "def f<'a>(a: 'a, b: 'a, y: Int, z: Int) -> 'a: if y ==<Int> z: a else: b\nf<Bool>(true, false, 3, 4): Bool"
-      "false"
-  ; tc
-      "tc_func_mix_generic_and_concrete_3"
-      "def f<'a>(a: 'a, b: 'a, y: Int, z: Int) -> 'a: if y ==<Int> z: a else: b\nf<Int>(12, 42, 3, 4): Int"
-      "42"
-  ; tc
-      "tc_func_mix_generic_and_concrete_4"
-      "def f<'a>(a: 'a, b: 'a, y: Int, z: Int) -> 'a: if y ==<Int> z: a else: b\nf<Int>(12, 42, 3, 3): Int"
-      "12"
-  ; tce
-      "tc_unused_func_1"
-      "def f(x: Int) -> Bool: x\n1: Int"
-      "Type error at tc_unused_func_1, 1:23-1:24: expected Bool but got Int"
-  ; tce
-      "tc_unused_func_2"
-      "def f(x: 'a) -> 'a: x\n1: Int"
-      ("The type var 'a used at tc_unused_func_2, 1:9-1:11 is not a defined type var\n"
-      ^ "The type var 'a used at tc_unused_func_2, 1:16-1:18 is not a defined type var")
-  ; tce
-      "tc_unused_func_3"
-      "def f(x: FooBar) -> FooBar: x\n1: Int"
-      "The type name FooBar, used at <tc_unused_func_3, 1:20-1:26>, is not in scope"
-  ; tc "tc_func_blank_arg" "def f(_: Int) -> Int: 9\nf(2): Int" "9"
-  ; tc
-      "tc_func_tuple_1"
-      "def f(x: (Int * Bool)) -> (Bool * Int):\n  (x[1 of 2], x[0 of 2])\nf((3, true)): (Bool * Int)"
-      "(true, 3)"
-  ; tc
-      "tc_func_tuple_2"
-      "def f<'a, 'b>(x: ('a * 'b)) -> ('b * 'a):\n  (x[1 of 2], x[0 of 2])\nf<Bool, Int>((true, 3)): (Int * Bool)"
-      "(3, true)"
-  ]
-;;
-
-(* For things that can't be reached from just running a source program *)
-
-let tc_tuple_tests =
-  [ tc "tc_tuple_simple_1" "(1,2): (Int * Int)" "(1, 2)"
-  ; tc "tc_tuple_simple_2" "(1,(3, true)): (Int * (Int * Bool))" "(1, (3, true))"
-  ; tce "tc_tuple_simple_3" "(1, 2): (Int * Bool)" "Type error at tc_tuple_simple_3, 1:4-1:5: expected Bool but got Int"
-  ; tc "tc_tuple_simple_4" "let x: (Int*Int) = (1, 2) in x: (Int * Int)" "(1, 2)"
-  ; tce
-      "tc_tuple_simple_5"
-      "let x: (Int*Bool) = (1, false) in x: (Int * Int)"
-      "Type error at tc_tuple_simple_5, 1:34-1:35: expected (Int * Int) but got (Int * Bool)"
-  ; tce
-      "tc_tuple_simple_6"
-      "let x: (Int*Bool) = (false, true) in x: (Int * Bool)"
-      "Type error at tc_tuple_simple_6, 1:21-1:26: expected Int but got Bool"
-  ; tce
-      "tc_tuple_simple_7"
-      "let x: (Int*Bool) = (1, true) in x: (Bool * Bool)"
-      "Type error at tc_tuple_simple_7, 1:33-1:34: expected (Bool * Bool) but got (Int * Bool)"
-  ; tc "tc_tuple_get_1" "(let x: (Int * Bool) = (1, true) in x[0 of 2]): Int" "1"
-  ; tc "tc_tuple_get_2" "let x: (Int * Bool) = (1, true) in x[1 of 2]: Bool" "true"
-  ; tc
-      "tc_tuple_get_3"
-      "let x: (Int * (Bool * Int * Int)) = (1, (true, 5, -2)) in x[1 of 2]: (Bool * Int * Int)"
-      "(true, 5, -2)"
-  ; tc
-      "tc_tuple_get_4"
-      ("let x: (Int * (Bool * Int * Int)) = (1, (true, 5, -2)), y: Int=x[0 of 2], z: (Bool * Int * Int)=x[1 of 2] in \
-        z: "
-      ^ "(Bool * Int * Int)")
-      "(true, 5, -2)"
-  ; tc
-      "tc_tuple_get_5"
-      ("let x: (Int * (Bool * Int * Int)) = (1, (true, 5, -2)), y: Int=x[0 of 2], z: (Bool * Int * Int)=x[1 of 2] in "
-      ^ "y: Int")
-      "1"
-  ; tce
-      "tc_tuple_get_6"
-      "let x: (Int * Bool) = (1, true) in x[0 of 2]: Bool"
-      "Type error at tc_tuple_get_6, 1:35-1:44: expected Bool but got Int"
-  ; tce
-      "tc_tuple_get_7"
-      "let x: (Int * Bool) = (1, true) in x[1 of 2]: Int"
-      "Type error at tc_tuple_get_7, 1:35-1:44: expected Int but got Bool"
-  ; tce
-      "tc_tuple_get_8"
-      ("let x: (Int * (Bool * Int * Int)) = (1, (true, 5, -2)), y: Bool=x[0 of 2], z: (Bool * Int * Int)=x[1 of 2] in "
-      ^ "z: (Bool * Int * Int)")
-      "Type error at tc_tuple_get_8, 1:64-1:73: expected Bool but got Int"
-  ; tce
-      "tc_tuple_get_9"
-      "let x: (Int * Int * Int) = (1, 2, 3) in x[0 of 2]: Int"
-      "Type error at tc_tuple_get_9, 1:40-1:49: tuple is of length 3, but was accessed as if it was of length 2"
-  ; tc "tc_tuple_get_10" "let a: (Int * (Int * Int)) = (1, (2,3)), b: (Int * Int) = a[1 of 2] in b[1 of 2]: Int" "3"
-  ; tc "tc_tuple_get_11" "let a: (Int * (Int * Int)) = (1, (2,3)) in a[1 of 2][1 of 2]: Int" "3"
-  ; tc "tc_tuple_set_1" "let x: (Int * Int) = (1, 2), y: Int = 10 in x[0 of 2 := y]: (Int * Int)" "(10, 2)"
-  ; tc "tc_tuple_set_2" "let x: (Int * Int) = (1, 2), y: Int = -3 in x[1 of 2 := y]: (Int * Int)" "(1, -3)"
-  ; tce
-      "tc_tuple_set_3"
-      "let x: (Int * Int) = (1, 2), y: Bool = true in x[1 of 2 := y]: (Int * Int)"
-      "Type error at tc_tuple_set_3, 1:59-1:60: expected Int but got Bool"
-  ; tc "tc_tuple_set_4" "let x: (Int * Bool) = (1, true), y: Bool = false in x[1 of 2 := y]: (Int * Bool)" "(1, false)"
-  ; tc
-      "tc_tuple_set_5"
-      ("let x: (Int * (Int * Bool)) = (1, (-3, true)), y: (Int * Bool) = (5, false) in "
-      ^ "x[1 of 2 := y]: (Int * (Int * Bool))")
-      "(1, (5, false))"
-  ; tce
-      "tc_tuple_set_6"
-      "let x: (Int * Int) = (1, 2), y: Int = 4 in x[1 of 3 := y]: (Int * Int)"
-      "Type error at tc_tuple_set_6, 1:43-1:57: tuple is of length 2, but was accessed as if it was of length 3"
-  ; tce
-      "tc_tuple_set_7"
-      "let x: (Int * Int) = (1, 2), y: Int = 4 in x[1 of 2 := y]: (Int * Bool)"
-      ("Type error at tc_tuple_set_7, 1:43-1:44: expected (Int * Bool) but got (Int * Int)\n"
-      ^ "Type error at tc_tuple_set_7, 1:55-1:56: expected Bool but got Int")
-  ; tce
-      "tc_tuple_set_8"
-      "let x: (Int * Int) = (1, 2) in x[1 of 2 := 3]: (Int * Bool)"
-      ("Type error at tc_tuple_set_8, 1:31-1:32: expected (Int * Bool) but got (Int * Int)\n"
-      ^ "Type error at tc_tuple_set_8, 1:43-1:44: expected Bool but got Int")
-  ; tc "tc_tuple_set_9" "let x: (Int * Int) = (1, 2) in x[0 of 2 := 3]: (Int * Int)" "(3, 2)"
-  ; tc "tc_tuple_set_10" "let x: (Int * Int) = (1, 2) in x[0 of 2 := (if true: 3 else: 5)]: (Int * Int)" "(3, 2)"
-  ; tce
-      "tc_tuple_set_11"
-      "let x: (Int * Int) = (1, 2) in x[0 of 2 := (if true: 3 else: false)]: (Int * Int)"
-      "Type error at tc_tuple_set_11, 1:61-1:66: expected Int but got Bool"
-  ; tce
-      "tc_tup_set_12"
-      "let x: (Int * Int) = (1,2) in x[0 of 2 := false][1 of 2 := -2]: (Int * Int)"
-      "Type error at tc_tup_set_12, 1:42-1:47: expected Int but got Bool"
-  ; tce
-      "tc_tup_set_13"
-      "let x: (Int * Int) = (1,2) in x[0 of 2 := -1][1 of 2 := true]: (Int * Int)"
-      "Type error at tc_tup_set_13, 1:56-1:60: expected Int but got Bool"
-  ; tce
-      "tc_tup_set_14"
-      "let x: (Int * Int) = (1,2) in x[0 of 2 := -1][1 of 3 := 5]: (Int * Int)"
-      "Type error at tc_tup_set_14, 1:30-1:58: tuple is of length 2, but was accessed as if it was of length 3"
-  ; tce
-      "tc_tupl_set_15"
-      "let x: (Int * Int) = (1,2) in x[0 of 3 := -1][1 of 2 := 5]: (Int * Int)"
-      "Type error at tc_tupl_set_15, 1:30-1:45: tuple is of length 2, but was accessed as if it was of length 3"
-  ; tce
-      "tc_tuple_set_16"
-      "let x: (Int * Bool) = (1,2) in x[0 of 3 := -1][1 of 2 := 5]: (Int * Int)"
-      ("Type error at tc_tuple_set_16, 1:31-1:32: expected (Int * Int) but got (Int * Bool)\n"
-      ^ "Type error at tc_tuple_set_16, 1:31-1:46: tuple is of length 2, but was accessed as if it was of length 3\n"
-      ^ "Type error at tc_tuple_set_16, 1:25-1:26: expected Bool but got Int")
-  ; tc "tc_tuple_set_17" "let x: (Int * Int) = (1,2) in x[0 of 2 := -1][1 of 2 := 5]: (Int * Int)" "(-1, 5)"
-  ; tc "tc_tuple_unpacking_1" "let t: (Int * Int) = (1,3), (x: Int, y: Int) = t in x+y: Int" "4"
-  ; tc
-      "tc_tuple_unpacking_2"
-      "let t: (Int * (Int * Bool))=(1, (2, true)) in let (x: Int, (y: Int, z: Bool)) = t in (if z: x else: y): Int"
-      "1"
-  ; tc "tuple_unpacking_3" "let (x: Int, (y: Int, z: Bool)) = (1, (3, true)) in (if z: x else: y): Int" "1"
-  ; tc "tc_tuple_unpacking_4" "let t: (Int * Int) = (1,3), (x: Int, y: Int) = (t: (Int * Int)) in x+y: Int" "4"
-  ; tce
-      "tc_tuple_unpacking_5"
-      "let t: (Int * Bool) = (1,true), (x: Int, y: Int) = t in x+y: Int"
-      "Type error at tc_tuple_unpacking_5, 1:41-1:47: expected Int but got Bool"
-  ; tce
-      "tc_tuple_unpacking_6"
-      "let t: (Int * Int * Int) = (1,3,5), (x: Int, y: Int) = t in x+y: Int"
-      ("Type error at tc_tuple_unpacking_6, 1:45-1:51: tuple is of length 3, but was accessed as if it was of length 2\n"
-      ^ "Type error at tc_tuple_unpacking_6, 1:37-1:43: tuple is of length 3, but was accessed as if it was of length 2"
-      )
-  ; tc
-      "tc_tuple_unpacking_7"
-      "let t: (Int * (Int * Bool)) = (1, (3, true)), (x: Int, y: (Int * Bool)) = t in x+(y[0 of 2]): Int"
-      "4"
-  ; tce
-      "tc_tuple_unpacking_8"
-      "let t: (Int * (Int * Bool)) = (1, (3, true)), (x: Int, y: (Int * Bool)) = t in x+(y[1 of 2]): Int"
-      "Type error at tc_tuple_unpacking_8, 1:82-1:91: expected Int but got Bool"
-  ; tc
-      "tc_given_func_unpacking_tuple"
-      ("def add_pairs((x1: Int, y1: Int), (x2: Int, y2: Int)) -> (Int * Int):\n(x1 + x2, y1 + y2)\n"
-      ^ "let p1: (Int * Int) = (1,2), p2: (Int * Int) = (5,7) in add_pairs(p1, p2): (Int * Int)")
-      "(6, 9)"
-  ; tc
-      "tuple_chain_1"
-      "let t: (Int * (Int * (Int * Bool))) = (1, (2, (3, false))) in t[1 of 2][1 of 2][1 of 2]: Bool"
-      "false"
-  ; tce
-      "tuple_chain_2"
-      "let t: (Int * (Int * (Int * Bool))) = (1, (2, (3, false))) in t[1 of 2][1 of 2][1 of 3]: Bool"
-      "Type error at tuple_chain_2, 1:62-1:87: tuple is of length 2, but was accessed as if it was of length 3"
-  ; tce
-      "tuple_chain_3"
-      "let t: (Int * (Int * (Int * Bool))) = (1, (2, (3, false))) in t[1 of 2][1 of 2][1 of 2]: Int"
-      "Type error at tuple_chain_3, 1:62-1:87: expected Int but got Bool"
-  ; tce
-      "tuple_chain_4"
-      "let t: (Int * (Int * Int)) = (1, (1, 2)) in t[1 of 2][0 of 3]: Int"
-      "Type error at tuple_chain_4, 1:44-1:61: tuple is of length 2, but was accessed as if it was of length 3"
-  ; tc "tuple_chain_5" "let t: (Int * (Int * Int)) = (1, (1, 2)) in t[1 of 2][0 of 2]: Int" "1"
-  ; tce
-      "tuple_chain_6"
-      "let t = (1, (1, 2)) in t[1 of 2][0 of 2]: Int"
-      ("Type error at tuple_chain_6, 1:23-1:24: Expected to find a tuple type for expr t but instead found type <BLANK>\n"
-      ^ "The variable t at <tuple_chain_6, 1:4-1:5> has no type defined")
-  ; tce
-      "tuple_chain_7"
-      "let t: (Int * (Int * Int)) = (1, (1, 2)) in t[1 of 2][0 of 2][0 of 2]: Int"
-      ("Type error at tuple_chain_7, 1:44-1:61: Expected to find a tuple type for expr t[1 of 2][0 of 2] but instead "
-      ^ "found type Int")
-  ; tce
-      "tuple_chain_8"
-      "let t: Bool = false in t[1 of 2][0 of 2]: Bool"
-      "Type error at tuple_chain_8, 1:23-1:24: Expected to find a tuple type for expr t but instead found type Bool"
-  ; tc "tuple_chain_9" "def f(x: (Int * (Int * Int))) -> Int: x[1 of 2][0 of 2]\nf((1,(2,3))): Int" "2"
-  ; tce
-      "tuple_chain_10"
-      "def f(x: (Int * (Int * Int))) -> Int: x[1 of 2][0 of 2][1 of 3]\nf((1,(2,3))): Int"
-      ("Type error at tuple_chain_10, 1:38-1:55: Expected to find a tuple type for expr x[1 of 2][0 of 2] but "
-      ^ "instead found type Int")
-  ; tce
-      "tuple_chain_11"
-      "def f(x: (Int * (Int * Int))) -> Int: x[1 of 2][0 of 3]\nf((1,(2,3))): Int"
-      "Type error at tuple_chain_11, 1:38-1:55: tuple is of length 2, but was accessed as if it was of length 3"
-  ; tc "tc_nil_1" "(nil: Int) : Int" "nil"
-  ; tce "tc_nil_2" "(nil: Bool) : Int" "Type error at tc_nil_2, 1:1-1:10: expected Int but got Bool"
-  ; tc "tc_tuple_func_unpacking_1" "def f((x: Int, y:Int)) -> Int:\nx+y\nlet tup: (Int*Int) = (3,4) in f(tup): Int" "7"
-  ; tce
-      "tc_tuple_func_unpacking_2"
-      "def f((x: Int, y:Int)) -> Int:\nx+y\nlet tup: (Int*Bool) = (3,false) in f(tup): Int"
-      "Type error at tc_tuple_func_unpacking_2, 3:37-3:40: expected (Int * Int) but got (Int * Bool)"
-  ]
-;;
-
-let tc_input_tests =
-  [ tc_input "tc_input_1" "input<Int>(): Int" "1\n" "1"
-  ; tce "tc_input_2" "input<Int>(): Bool" "Type error at tc_input_2, 1:0-1:12: expected Bool but got Int"
-  ; tc_input
-      "tc_input_3"
-      "let x: (Int * Bool) = (input<Int>(), input<Bool>()) in x: (Int * Bool)"
-      "1\ntrue\n"
-      "(1, true)"
-  ; tc_input
-      "tc_input_4"
-      "let x: (Int * Bool) = (input<Int>(), input<Bool>()) in x: (Int * Bool)"
-      "-123\ntrue\n"
-      "(-123, true)"
-  ; tce
-      "tc_input_5"
-      "let x: (Int * Bool) = (input<Int>(), input<Int>()) in x: (Int * Bool)"
-      "Type error at tc_input_5, 1:37-1:49: expected Bool but got Int"
-  ; tc_input "tc_input_6" "input<Int>() + 5: Int" "5\n" "10"
-  ; tce_input
-      "tc_input_7"
-      "input<Int>() + 5: Int"
-      "true\n"
-      "input() received invalid data ('true') when it was annotated to expect an int"
-  ; tce "tc_input_8" "input<Bool>() + 5: Int" "Type error at tc_input_8, 1:0-1:13: expected Int but got Bool"
-  ; tce_input
-      "tc_input_9"
-      "input<Bool>(): Bool"
-      "5\n"
-      "input() received invalid data ('5') when it was annotated to expect a bool"
-  ; tce_input
-      "tc_input_10"
-      "input<(Int * Int)>(): (Int * Int)"
-      "1\n"
-      "Unsupported: input() can only read Ints and Booleans from stdin at <tc_input_10, 1:0-1:20>"
-  ]
-;;
-
-let tydecl_tests =
-  [ tc "tydecl_1" "type foo = (Int * Int)\nlet x: foo = (1,2) in x: foo\n" "(1, 2)"
-  ; tc "tydecl_2" "type foo = (Int * Int)\nlet x: foo = (1,2) in x: (Int * Int)\n" "(1, 2)"
-  ; tc "tydecl_3" "type foo = (Int * Int)\nlet x: (Int * Int) = (1,2) in x: foo\n" "(1, 2)"
-  ; tce
-      "tydecl_4"
-      "type foo = (Int * Bool)\nlet x: (Int * Int) = (1,2) in x: foo\n"
-      "Type error at tydecl_4, 2:30-2:31: expected (Int * Bool) but got (Int * Int)"
-  ; tce
-      "tydecl_5"
-      "type foo = (Int * Bool)\nlet x: foo = (1,2) in x: foo\n"
-      "Type error at tydecl_5, 2:16-2:17: expected Bool but got Int"
-  ; tc
-      "tydecl_6"
-      "type foo = (Int * Bool)\n\
-       type bar = (Bool * Int)\n\
-       def f(x: foo) -> bar:\n\
-      \  (x[1 of 2], x[0 of 2])\n\
-       f((3, true)): bar"
-      "(true, 3)"
-  ; tc "tydecl_7" "type foo<'a, 'b> = ('a * 'b)\nlet x: foo<Int, Int> = (1,2) in x: foo<Int, Int>" "(1, 2)"
-  ; tce
-      "tydecl_8"
-      "type foo<'a, 'b> = ('a * 'b)\nlet x: foo<Int, Int> = (1,2) in x: foo<Int, Bool>"
-      "Type error at tydecl_8, 2:32-2:33: expected (Int * Bool) but got (Int * Int)"
-  ; tce
-      "tydecl_9"
-      "type foo<'a, 'b> = ('a * 'b)\nlet x: foo<Int, Bool> = (1,2) in x: foo<Int, Int>"
-      ("Type error at tydecl_9, 2:33-2:34: expected (Int * Int) but got (Int * Bool)\n"
-      ^ "Type error at tydecl_9, 2:27-2:28: expected Bool but got Int")
-  ; tce
-      "tydecl_10"
-      "type foo<'a, 'b> = ('a * 'b)\nlet x: foo<Int, Int> = (1,true) in x: foo<Int, Int>"
-      "Type error at tydecl_10, 2:26-2:30: expected Int but got Bool"
-  ; tce
-      "tydecl_11"
-      "type foo<'a, 'b> = ('a * 'b)\nlet x: foo<Int> = (1,2) in x: foo<Int, Bool>"
-      "The tydecl foo, instantiated at tydecl_11, 2:7-2:15, expected 2 type arguments but only 1 types provided"
-  ; tce
-      "tydecl_12"
-      "type foo = (Int * foo)\n4: Int"
-      "The type name foo, used at <tydecl_12, 1:18-1:21>, is not in scope"
-  ; tce "tydecl_13" "type foo = Int\n4: foo" "Parse error at line 1, col 14"
-  ; tce "tydecl_14" "type foo = (Int)\n4: foo" "Type error at tydecl_14, 2:0-2:1: expected (Int) but got Int"
-  ; tc "tydecl_15" "type foo = (Int)\n(4,): foo" "(4, )"
-  ; tc "tydecl_16" "type foo = (Int * Int)\ntype bar=(foo * Bool)\n((1,2), false): bar" "((1, 2), false)"
-  ; tce
-      "tydecl_17"
-      "type foo = (Int * Int)\ntype bar=(foo * Bool)\n((1,true), false): bar"
-      "Type error at tydecl_17, 2:26-2:30: expected Int but got Bool"
-  ]
-;;
-
-let tc_equal_tests =
-  [ tc "tc_equal_1" "equal<Int>(1, 2): Bool" "false"
-  ; tc "tc_equal_2" "equal<Int>(1, 1): Bool" "true"
-  ; tc "tc_equal_3" "equal<(Int * Int)>((1, 2), (1, 2)): Bool" "true"
-  ; tc "tc_equal_4" "equal<(Int * Int)>((1, 3), (1, 2)): Bool" "false"
-  ; tce
-      "tc_equal_5"
-      "equal<(Int * Int)>((1, true), (1, 2)): Bool"
-      "Type error at tc_equal_5, 1:23-1:27: expected Int but got Bool"
-  ]
-;;
-
 let function_tests =
   simple_non_recursive_function_tests @ simple_recursive_function_tests @ tail_rec_tests @ equal_tests @ input_tests
 ;;
 
 let higher_ordered_functions_tests = simple_lambda_tests @ closure_tests @ letrec_tests @ freevars_tests
 let error_tests = well_formed_failures @ parser_tests @ overflow_tests
-let misc_tests = misc_unit_tests @ rename_tests @ remove_illegal_immediates_tests @ anf_tests @ desugar_tests
+let misc_tests = misc_unit_tests @ remove_illegal_immediates_tests
 let prim1_tests = not_tests @ is_num_bool_tests @ is_tuple_tests @ print_tests @ prim1_arith_tests
 let prim2_tests = prim2_arith_tests @ num_comparison_tests @ bool_comparison_tests
 
 let compile_tests =
   []
-  (* @ simple_tests
+  @ simple_tests
   @ tuple_tests
   @ nil_tests
   @ prim1_tests
@@ -2691,29 +1817,13 @@ let compile_tests =
   @ misc_tests
   @ oom_tests
   @ interpreter_tests
-  @ higher_ordered_functions_tests *)
-  (* @ gc_tests
-  @ string_tests  *)
+  @ higher_ordered_functions_tests
+  @ gc_tests
+  @ string_tests 
   @ exn_tests 
 ;;
 
-let typecheck_tests =
-  []
-  (* @ tc_simple_tests
-  @ tc_sequence_tests
-  @ tc_prim1_tests
-  @ tc_prim2_tests
-  @ tc_if_tests
-  @ tc_annot_tests
-  @ tc_let_tests
-  @ tc_tuple_tests
-  @ tc_input_tests
-  @ tc_func_tests
-  @ tydecl_tests
-  @ tc_equal_tests *)
-;;
-
-let suite = "suite" >::: typecheck_tests @ compile_tests
+let suite = "suite" >::: compile_tests
 let () = run_test_tt_main ("all_tests" >::: [ suite; 
 (* TODO *)
 (* input_file_test_suite ()  *)

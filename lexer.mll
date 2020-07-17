@@ -20,8 +20,6 @@ let signed_int = dec_digit+ | ('-' dec_digit+)
 
 let ident = ['a'-'z' 'A'-'Z' '_']['a'-'z' 'A'-'Z' '0'-'9' '_']*
 
-let tyident = "'"['a'-'z' 'A'-'Z' '_']['a'-'z' 'A'-'Z' '0'-'9' '_']*
-
 let blank = [' ' '\t']+
 
 let space = [' ' '\t' '\n']+
@@ -44,7 +42,6 @@ rule token = parse
   | "and" { ANDDEF }
   | "printStack" { PRINTSTACK }
   | "nil" { NIL }
-  | "type" { TYPE }
   | "true" { TRUE }
   | "false" { FALSE }
   | "istuple" { ISTUPLE }
@@ -90,7 +87,6 @@ rule token = parse
   | "exception" { EXCEPTION }
   | "throw" { THROW }
   | "yeet" { THROW }
-  | tyident as x { TYID (String.sub x 1 (String.length x - 1)) }
   | ident as x { if x = "_" then UNDERSCORE else ID x }
   | eof { EOF }
   | _ as c { failwith (sprintf "Unrecognized character: %c" c) }
