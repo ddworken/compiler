@@ -276,6 +276,7 @@ SNAKEVAL string_len(SNAKEVAL val) {
 uint64_t* get_next_avail_heap_slot() {
       uint64_t* x;
     asm("\t movq %%r15,%0" : "=r"(x));
+    assert(((uint64_t)x % (uint64_t)16) == 0);
     return x;
 }
 
@@ -301,11 +302,13 @@ void* try_gc_runtime(uint64_t bytes_needed) {
   printf("DEBUG: alloc_ptr=%p, bytes_needed=%ld, cur_frame=%p, cur_stack_top=%p\n", alloc_ptr, bytes_needed, cur_frame, cur_stack_top);
   printf("used heap space=%ld\n", ((uint64_t)alloc_ptr) - ((uint64_t)HEAP_BASE));
 
-  return (void*)try_gc(alloc_ptr, bytes_needed, cur_frame, cur_stack_top);
+  void* val = (void*)try_gc(alloc_ptr, bytes_needed, cur_frame, cur_stack_top);
+  get_next_avail_heap_slot();
+  return val;
 }
 
 void bump_heap_pointer(uint64_t amt) {
-  volatile uint64_t temp = ((uint64_t)get_next_avail_heap_slot()) + amt;
+  volatile uint64_t* temp = align_to_16((uint64_t*)(((uint64_t)get_next_avail_heap_slot()) + amt));
 asm("movq %0,%%r15"
   : 
   : "rm" (temp)
