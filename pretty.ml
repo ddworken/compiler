@@ -204,6 +204,10 @@ let string_of_sourcespan ((pstart, pend) : sourcespan) : string =
   sprintf "%s, %d:%d-%d:%d" pstart.pos_fname pstart.pos_lnum (pstart.pos_cnum - pstart.pos_bol)
           pend.pos_lnum (pend.pos_cnum - pend.pos_bol)
 
+let string_of_sourcespan_without_fn ((pstart, pend) : sourcespan) : string =
+  sprintf "(%d:%d-%d:%d)" pstart.pos_lnum (pstart.pos_cnum - pstart.pos_bol)
+          pend.pos_lnum (pend.pos_cnum - pend.pos_bol)
+
 let rec string_of_aexpr_with (depth : int) (print_a : 'a -> string) (e : 'a aexpr) : string =
   let string_of_aexpr = string_of_aexpr_with (depth - 1) print_a in
   let string_of_cexpr = string_of_cexpr_with (depth - 1) print_a in

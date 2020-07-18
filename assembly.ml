@@ -1,6 +1,10 @@
 open Printf
 open Int64
 open Errors
+open Exprs 
+open String 
+open Pretty 
+open TypeCheck
 
 (* Abstract syntax of (a small subset of) x86 assembly instructions *)
 let word_size = 8
@@ -81,6 +85,7 @@ type instruction =
   | ITest of arg * arg
   | ILineComment of string
   | IInstrComment of instruction * string
+  | ILocationData of instruction * sourcespan list 
   | IEnter of int * int
   | ILeave
   | CMovne of arg * arg
@@ -171,6 +176,7 @@ let rec i_to_asm (i : instruction) : string =
   | ITest (arg, comp) -> sprintf "  test %s, %s" (arg_to_asm arg) (arg_to_asm comp)
   | ILineComment str -> sprintf "  ;; %s" str
   | IInstrComment (instr, str) -> sprintf "%s ; %s" (i_to_asm instr) str
+  | ILocationData (instr, locs) -> sprintf "%s ; \t\t\t\t\t#Source_Map:[%s]" (i_to_asm instr) (ExtString.String.join ", " (List.map string_of_sourcespan_without_fn (List.filter (fun (l) -> l <> dummy_span) locs)))
   | IEnter (slots, depth) -> sprintf "  enter %d, %d" slots depth
   | ILeave -> "  leave"
   | CMovne (a, b) -> sprintf "  cmovne %s, %s" (arg_to_asm a) (arg_to_asm b)
@@ -237,6 +243,14 @@ let rec remove_illegal_immediates (instructions : instruction list) : instructio
       raise
         (InternalCompilerError
            (sprintf "remove_illegal_immediates encountered %s when expecting an IInstrComment" (to_asm err))))
+  | ILocationData (i, s) :: rest ->
+    (match remove_illegal_immediates [ i ] with
+    | [ i ] -> ILocationData (i, s) :: remove_illegal_immediates rest
+    | [ a; b ] -> ILocationData(a, s) :: ILocationData (b, s) :: remove_illegal_immediates rest
+    | err ->
+      raise
+        (InternalCompilerError
+           (sprintf "remove_illegal_immediates encountered %s when expecting an ILocationData" (to_asm err))))
   | op :: rest -> op :: remove_illegal_immediates rest
   | [] -> []
 ;;

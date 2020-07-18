@@ -929,7 +929,7 @@ let desugar (p : sourcespan program) : sourcespan program fallible =
         List.map
           (fun (d : sourcespan decl) ->
             let (DFun (fn, args, _, body, loc)) = d in
-            BName (fn, TyBlank dummy_span, dummy_span), ELambda (args, body, dummy_span), loc)
+            BName (fn, TyBlank dummy_span, dummy_span), ELambda (args, body, loc), loc)
           g
       in
       ELetRec (bindings, body, dummy_span)
@@ -1025,6 +1025,13 @@ let rec set_subtraction (l1 : string list) (l2 : string list) : string list =
   | [] -> []
 ;;
 
+let tag_instructions_with_location (instrs: instruction list) (loc: sourcespan) : instruction list = 
+  let tag_instruction_with_location (instr: instruction) = (
+    match instr with 
+     | ILocationData(instr, locs) -> ILocationData(instr, loc::locs)
+     | instr -> ILocationData(instr, [loc])
+  ) in List.map tag_instruction_with_location instrs 
+
 (* Compile the given aexpr to a list of instructions *)
 let rec compile_aexpr
     (* The expr to compile *)
@@ -1046,13 +1053,14 @@ let rec compile_aexpr
     @ compile_cexpr var_val si env num_args was_typechecked
     @ [ ILineComment "The body of the blank binding:" ]
     @ compile_aexpr body si env num_args was_typechecked
-  | ALet (var_name, var_val, body, _) ->
+  | ALet (var_name, var_val, body, t) ->
     let prelude = compile_cexpr var_val (si + 1) env num_args was_typechecked in
     let stack_reg = RegOffset (~-si, RBP) in
     let body = compile_aexpr body (si + 1) ((var_name, stack_reg) :: env) num_args was_typechecked in
-    prelude
+    let code = prelude
     @ [ IInstrComment (IMov (stack_reg, Reg RAX), sprintf "%s holds the variable %s" (arg_to_asm stack_reg) var_name) ]
-    @ body
+    @ body in 
+    tag_instructions_with_location code (get_sourcespan t) 
   | ACExpr cexpr -> compile_cexpr cexpr si env num_args was_typechecked
   | ASeq (e1, e2, _) ->
     compile_cexpr e1 si env num_args was_typechecked @ compile_aexpr e2 si env num_args was_typechecked
@@ -1278,6 +1286,7 @@ and compile_lam_helper
         ; ILineComment (sprintf "} store lambda-%d" (get_int tag))
         ]
     in
+    let code = tag_instructions_with_location code (get_sourcespan tag) in 
     code, used_heap_slots, List.combine reserved_args reserved_arg_heap_locations
   | CIf _ | CPrim1 _ | CPrim2 _ | CTuple _ | CImmExpr _ | CApp _ | CGetItem _ | CSetItem _ | CString _ | CTryCatch _ | CThrow _->
     raise (InternalCompilerError "compile_lam_helper called on a non-CLambda")
@@ -1793,7 +1802,7 @@ and compile_fun_app (e : tag cexpr) (env : arg envt) (was_typechecked : bool) : 
 
 let compile_prog (was_typechecked : bool) (anfed : tag aprogram) : string =
   match anfed with
-  | AProgram ([], body, _) ->
+  | AProgram ([], body, tag) ->
     let externs = ["error"; "native#print"; "print_stack"; "try_gc"; "STACK_BOTTOM"; "STACK_SIZE"; "native#string_len"; "native#string_append"; "native#char_at"; "native#input"; "native#equal"; "HEAP_END"; "add_to_exn_table"; "get_exn_depth"; "get_exn_location"; "clear_from_exn_table"; "clear_exn_table_before_jmp"; "increment_exn_depths"; "decrement_exn_depths"] in 
     let prelude =
       "section .text\nglobal our_code_starts_here\nglobal EXCEPTION_NAMES\n" ^ String.concat "\n" (List.map (fun (x) -> "extern " ^ x) externs)
@@ -1860,7 +1869,7 @@ let compile_prog (was_typechecked : bool) (anfed : tag aprogram) : string =
         ; ILineComment "} heap setup"
         ; IInstrComment (IMov (LabelContents "STACK_BOTTOM", Reg RBP), "Init STACK_BOTTOM")
         ]
-      @ compile_aexpr body 1 [] 0 was_typechecked
+      @ tag_instructions_with_location (compile_aexpr body 1 [] 0 was_typechecked) (get_sourcespan tag)
       @ postlude
     in
     let legal_all_instructions = remove_illegal_immediates all_instructions in
