@@ -1,8 +1,8 @@
-def max(a: Int, b: Int) -> Int:
-    let x: Int=print<Int>(-1) in 
-    if print<Int>(a) >= print<Int>(b):
+def max(a, b) :
+    let x=print(-1) in 
+    if print(a) >= print(b):
         a
     else:
         max(b, a)
 
-max(0,2): Int 
+max(0,2) 

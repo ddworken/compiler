@@ -1,10 +1,1 @@
-exception foo
-
-def func(n): 
-	if n == 0: throw foo 
-	else: 
-		try { func(n - 1) } 
-		catch (foo) { print(n); throw foo }
-
-try { func(10) } 
-catch (foo) { print(123) }
+10 / 4

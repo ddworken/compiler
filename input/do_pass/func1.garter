@@ -1,5 +1,5 @@
-def f(x: Int, y: Int) -> Int:
+def f(x, y) :
   x + y
 
-f(1, 2): Int 
+f(1, 2) 
 

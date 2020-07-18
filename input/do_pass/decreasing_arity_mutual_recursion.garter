@@ -1,11 +1,11 @@
-def f2(a: Int, b: Int) -> Int: 
-    let _1: Int=print<Int>(a), _2: Int=print<Int>(b), _sep: Int=print<Int>(-1) in 
-    if a ==<Int> 0:
+def f2(a, b) : 
+    let _1=print(a), _2=print(b), _sep=print(-1) in 
+    if a == 0:
         b 
     else:
         f1(a)
 
-and def f1(a: Int) -> Int:
+and def f1(a) :
     f2(a - 1, 3)
 
-f2(5, 5): Int 
+f2(5, 5) 

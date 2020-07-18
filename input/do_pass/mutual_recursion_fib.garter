@@ -1,13 +1,13 @@
-def fib1(x: Int) -> Int: 
+def fib1(x) : 
     if x <= 2: 
         1 
     else: 
         fib2(x - 1) + fib2(x - 2)
 
-and def fib2(x: Int) -> Int: 
+and def fib2(x) : 
     if x <= 2: 
         1 
     else: 
         fib1(x - 1) + fib1(x - 2)   
 
-fib1(10): Int 
+fib1(10) 

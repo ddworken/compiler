@@ -9,7 +9,6 @@ open TypeCheck
 module StringSet = Set.Make (String)
 module StringMap = Map.Make (String)
 
-(* TODO: don't be a bad person and use a global here: *)
 let global_defined_exns = ref [] 
 
 type 'a sm_envt = 'a StringMap.t
@@ -20,11 +19,11 @@ type 'a envt = (string * 'a) list
 All data types are tagged in order to support runtime type checking
 
 Tags:
-0bxx0   --> Int63
-0b111   --> Boolean
-0b101   --> Closure
-0b001   --> Tuple 
-0b011   --> String
+0bxx0   -->  Int63
+0b111   -->  Boolean
+0b101   -->  Closure
+0b001   -->  Tuple 
+0b011   -->  String
 *)
 
 let bool_tag = 0x0000000000000007L
@@ -209,6 +208,7 @@ let rename_and_tag (p : tag program) : tag program =
       let binds', env' = helpBS env binds in
       let body' = helpE env' body in
       ELambda (binds', body', tag)
+    | ETryCatchFinally _ -> raise (NotYetImplemented "ETryCatchFinally")
   in
   rename [] p
 ;;
@@ -416,6 +416,7 @@ let anf (p : tag program) : unit aprogram =
       body_ans, exp_setup @ [ BLet (bind, exp_ans) ] @ body_setup
     | ELet ((BTuple (binds, _), exp, _) :: rest, body, pos) ->
       raise (InternalCompilerError "Tuple bindings should have been desugared away")
+    | ETryCatchFinally _ -> raise (NotYetImplemented "ETryCatchFinally")
   and helpA e : unit aexpr =
     let ans, ans_setup = helpC e in
     List.fold_right
@@ -659,6 +660,7 @@ let is_well_formed (p : sourcespan program) : sourcespan program fallible =
         | BTuple (args, _) -> List.concat (List.map flatten_bind args)
       in
       process_args binds @ wf_E body (merge_envs (List.concat (List.map flatten_bind binds)) env) tyenv
+      | ETryCatchFinally _ -> raise (NotYetImplemented "ETryCatchFinally")
   and wf_D d (env : scope_info sm_envt) (tyenv : StringSet.t) =
     match d with
     | DFun (_, args, typ, body, _) ->
@@ -720,7 +722,6 @@ let is_well_formed (p : sourcespan program) : sourcespan program fallible =
       in
       let errs = List.flatten (List.map (wf_T tyenv) args) in
       errs, tyenv
-    (* TODO: wf for defined exceptions *)
     | ExceptionDecl(name, _) -> [], tyenv
 
   in
@@ -837,6 +838,7 @@ let desugar (p : sourcespan program) : sourcespan program fallible =
       ELetRec (List.flatten binds, helpE body tyenv, loc)
     | ETryCatch(e1, n, e2, loc) -> ETryCatch(helpE e1 tyenv, n, helpE e2 tyenv, loc)
     | EThrow(n, loc) -> EThrow(n, loc)
+    | ETryCatchFinally _ -> raise (NotYetImplemented "ETryCatchFinally")
   and helpBindsFlatten (tuplebind : string) (binds : sourcespan bind list) (tyenv : sourcespan scheme envt)
       : sourcespan binding list
     =
@@ -1276,7 +1278,7 @@ and compile_lam_helper
         ]
     in
     code, used_heap_slots, List.combine reserved_args reserved_arg_heap_locations
-  | CIf _ | CPrim1 _ | CPrim2 _ | CTuple _ | CImmExpr _ | CApp _ | CGetItem _ | CSetItem _ | CString _ ->
+  | CIf _ | CPrim1 _ | CPrim2 _ | CTuple _ | CImmExpr _ | CApp _ | CGetItem _ | CSetItem _ | CString _ | CTryCatch _ | CThrow _->
     raise (InternalCompilerError "compile_lam_helper called on a non-CLambda")
 
 (* Compile the given cexpr to a list of instructions *)
@@ -1526,7 +1528,7 @@ and compile_prim1 (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
     ; IMov (Reg RCX, compile_imm body env)
     ; ICall (Label "print_stack")
     ]
-  | (CIf _ | CPrim2 _ | CApp _ | CImmExpr _ | CSetItem _ | CTuple _ | CGetItem _ | CLambda _ | CString _) as err ->
+  | (CIf _ | CPrim2 _ | CApp _ | CImmExpr _ | CSetItem _ | CTuple _ | CGetItem _ | CLambda _ | CString _ | CTryCatch _ | CThrow _) as err ->
     raise (InternalCompilerError (sprintf "compile_prim1 called on a non-prim1: %s" (string_of_cexpr err)))
 
 (* Compile the given cexpr which must be a prim2 to a list of instructions *)
@@ -1627,7 +1629,7 @@ and compile_prim2 (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
       ; IMov (Reg RAX, const_false)
       ; ILabel cmp_done_label
       ]
-  | (CIf _ | CPrim1 _ | CApp _ | CImmExpr _ | CSetItem _ | CTuple _ | CGetItem _ | CLambda _ | CString _) as err ->
+  | (CIf _ | CPrim1 _ | CApp _ | CImmExpr _ | CSetItem _ | CTuple _ | CGetItem _ | CLambda _ | CString _ | CTryCatch _ | CThrow _) as err ->
     raise (InternalCompilerError (sprintf "compile_prim2 called on a non-prim2: %s" (string_of_cexpr err)))
 
 (* Assert that the given argument is an int. If it is not, jump to the given label which 
@@ -1784,7 +1786,7 @@ and compile_fun_app (e : tag cexpr) (env : arg envt) (was_typechecked : bool) : 
          (sprintf
             "compile_fun_app received an Unknown/Prim CApp, cannot compile this function application: %s"
             (string_of_cexpr e)))
-  | (CTuple _ | CIf _ | CPrim1 _ | CPrim2 _ | CGetItem _ | CSetItem _ | CLambda _ | CImmExpr _ | CString _) as err ->
+  | (CTuple _ | CIf _ | CPrim1 _ | CPrim2 _ | CGetItem _ | CSetItem _ | CLambda _ | CImmExpr _ | CString _ | CTryCatch _ | CThrow _) as err ->
     raise (InternalCompilerError ("compile_fun_app called on a non-CApp: " ^ string_of_cexpr err))
 ;;
 

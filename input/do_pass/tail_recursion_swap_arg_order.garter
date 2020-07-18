@@ -1,11 +1,11 @@
-def f(a: Int, b: Int, c: Int) -> Int:
-    let _1:Int=print<Int>(a), _2:Int=print<Int>(b), _3:Int=print<Int>(c) in 
-    if (a ==<Int> 0) && (b ==<Int> 0) && (c ==<Int> 0):
+def f(a, b, c) :
+    let _1=print(a), _2=print(b), _3=print(c) in 
+    if (a == 0) && (b == 0) && (c == 0):
         a + b + c
-    else: if a ==<Int> 0:
-        let _: Int = print<Int>(-1) in 
-        f(print<Int>(b), print<Int>(c), print<Int>(a))
+    else: if a == 0:
+        let _ = print(-1) in 
+        f(print(b), print(c), print(a))
     else: 
         f(a - 1, b, c)
 
-f(10, 11, 12): Int 
+f(10, 11, 12) 

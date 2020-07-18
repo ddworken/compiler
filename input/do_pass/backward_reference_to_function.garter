@@ -1,5 +1,5 @@
-def f(x: Int) -> Int: x
+def f(x): x
 
-def g(x: Int) -> Int: f(x)
+def g(x): f(x)
 
-g(2): Int
+g(2)

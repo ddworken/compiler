@@ -1,20 +1,20 @@
-def fib1(x: Int) -> Int:
+def fib1(x) :
 	if x <= 2: 1 
 	else: fib1(x - 1) + fib2(x - 2)
 
-and def fib2(x: Int) -> Int:
+and def fib2(x) :
 	if x <= 2: 1 
 	else: fib2(x - 1) + fib1(x - 2)
 
-def sum(x: Int, y: Int) -> Int: x+y
+def sum(x, y) : x+y
 
-def double_fib(n: Int) -> Int: sum(fib1(n), fib2(n))
+def double_fib(n) : sum(fib1(n), fib2(n))
 
-def zero_if_negative(n: Int) -> Int: if n < 0: 0 else: double_fib(n)
+def zero_if_negative(n) : if n < 0: 0 else: double_fib(n)
 
-def func() -> Int:
-	let x:Int = print<Int>(zero_if_negative(10)), y:Int =print<Int>(zero_if_negative(-10)) in x + y
+def func() :
+	let x = print(zero_if_negative(10)), y =print(zero_if_negative(-10)) in x + y
 
-def identity<'a>(x: 'a) -> 'a: x 
+def identity(x): x 
 
-(let a:Int=func() in identity<Int>(a)): Int 
+(let a=func() in identity(a)) 

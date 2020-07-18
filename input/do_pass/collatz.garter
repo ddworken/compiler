@@ -1,35 +1,35 @@
 # https://en.wikipedia.org/wiki/Collatz_conjecture
 
-def is_even(n: Int) -> Bool:
-    if n ==<Int> 0:
+def is_even(n) :
+    if n == 0:
         true 
     else: if n < 0: 
         false 
     else: 
         is_even(n - 2)
 
-def divide_by_two_helper(n: Int, orig: Int) -> Int:
-    if n * 2 ==<Int> orig:
+def divide_by_two_helper(n, orig) :
+    if n * 2 == orig:
         n 
     else: 
         divide_by_two_helper(n - 1, orig)
 
-def divide_by_two(n: Int) -> Int:
+def divide_by_two(n) :
     if !(is_even(n)):
         # Something went wrong, so just print 1337. If we weren't typechecking we could crash instead.
-        print<Int>(1337)
+        print(1337)
     else: 
         divide_by_two_helper(n, n)
 
-def collatz_helper(n: Int) -> Int:
-    if n ==<Int> 1:
+def collatz_helper(n) :
+    if n == 1:
         n
     else: if is_even(n):
-        collatz_helper(print<Int>(divide_by_two(n)))
+        collatz_helper(print(divide_by_two(n)))
     else:
-        collatz_helper(print<Int>((3 * n) + 1))
+        collatz_helper(print((3 * n) + 1))
 
-def collatz(n: Int) -> Int:
-    collatz_helper(print<Int>(n))
+def collatz(n) :
+    collatz_helper(print(n))
     
-collatz(27): Int
+collatz(27)

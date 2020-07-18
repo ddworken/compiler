@@ -1,4 +1,4 @@
-def make_overflow(n: Int) -> Int:
+def make_overflow(n) :
     make_overflow(n * 2)
 
-make_overflow(1): Int
+make_overflow(1)

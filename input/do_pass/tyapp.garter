@@ -1,6 +1,4 @@
-type foo<'a, 'b> = ('a * 'b)
-
-def f(x: foo<Int, Bool>) -> foo<Bool, Int>:
+def f(x):
   (x[1 of 2], x[0 of 2])
 
-let x: foo<Int, Bool> = (3, false) in f(x): foo<Bool, Int>
+let x = (3, false) in f(x)

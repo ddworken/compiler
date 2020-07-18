@@ -1,6 +1,6 @@
 # A tail recursive function that crashes cause we don't have TCO
-def func(n: Int) -> Int:
-	if n ==<Int> 0: n 
+def func(n):
+	if n == 0: n 
 	else: func(n - 1)
 
-func(1000000): Int 
+func(1000000) 

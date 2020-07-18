@@ -1,1 +1,1 @@
-print<Bool>(false) && print<Bool>(true): Bool
+print(false) && print(true)

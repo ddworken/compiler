@@ -1,6 +1,3 @@
-# This file does not type check, but we need a type on nil thanks to the parser so just fill it in with Any to mark that it is untyped
-type Any = (Int)
-
 def length(l):
   if l == (nil): 0
   else:

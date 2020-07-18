@@ -1,5 +1,5 @@
-def add(x: Int, y: Int) -> Int:
-    if y ==<Int> 0:
+def add(x, y) :
+    if y == 0:
         x
     else: 
         if y > 0:
@@ -7,36 +7,36 @@ def add(x: Int, y: Int) -> Int:
         else:
             add(sub1(x), add1(y))
 
-def flip(x: Int) -> Int: x * -1
+def flip(x) : x * -1
 
-def mul(x: Int, y: Int) -> Int:
-    if y ==<Int> 1:
+def mul(x, y) :
+    if y == 1:
         x
     else: if y > 1:
         add(x, mul(x, sub1(y)))
-    else: if y ==<Int> 0:
+    else: if y == 0:
         0
     else:
         flip(mul(x, flip(y)))
 
-def sub(x: Int, y: Int) -> Int:
+def sub(x, y) :
     add(x, flip(y))
 
 let 
     # 8
-    a:Int=print<Int>(add(3,5)), 
+    a=print(add(3,5)), 
     # -8:
-    b:Int=print<Int>(add(-3, -5)), 
+    b=print(add(-3, -5)), 
     # 15
-    c:Int=print<Int>(mul(5,3)), 
+    c=print(mul(5,3)), 
     # 0
-    d:Int=print<Int>(mul(5,0)),
+    d=print(mul(5,0)),
     # -15
-    e:Int=print<Int>(mul(5,-3)),
+    e=print(mul(5,-3)),
     # -15
-    f:Int=print<Int>(mul(-5,3)),
+    f=print(mul(-5,3)),
     # 5
-    g:Int=print<Int>(sub(8,3)),
+    g=print(sub(8,3)),
     # -3
-    h:Int=print<Int>(sub(8, 11)) in 
-a+b: Int 
+    h=print(sub(8, 11)) in 
+a+b 

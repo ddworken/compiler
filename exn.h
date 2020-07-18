@@ -14,8 +14,6 @@ typedef struct exn_handler {
 
 exn_handler *EXN_HANDLERS;
 uint64_t NEXT_EXN_HANDLER_SLOT = 0;
-// TODO: delete the below const?
-uint64_t EXN_HANDLER_SIZE = sizeof(struct exn_handler);
 uint64_t MAX_EXN_HANDLERS = 1000000;
 
 void add_to_exn_table(uint64_t exn, void *exn_handler, void *finally) {
