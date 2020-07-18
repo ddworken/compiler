@@ -132,11 +132,11 @@ let rename_and_tag (p : tag program) : tag program =
     | Program (tydecls, [], body, tag) -> Program (tydecls, [], helpE env body, tag)
     | Program (_, _, _, _) ->
       raise (InternalCompilerError "Found decls in rename_and_tag when they should have been desugared away")
-  and helpB env b =
+  and helpB env (b: tag bind) =
     match b with
     | BBlank (typ, tag) -> b, env
     | BName (name, typ, tag) ->
-      let name' = sprintf "%s_%d" name tag in
+      let name' = sprintf "%s_%d" name (get_int tag) in
       BName (name', typ, tag), (name, name') :: env
     | BTuple (binds, tag) ->
       let binds', env' = helpBS env binds in
@@ -238,26 +238,26 @@ let bind_to_name (b : 'a bind) : string =
   | _ -> raise (InternalCompilerError "Tuple bindings should have been desugared away")
 ;;
 
-let anf (p : tag program) : unit aprogram =
-  let rec helpP (p : tag program) : unit aprogram =
+let anf (p : tag program) : sourcespan aprogram =
+  let rec helpP (p : tag program) : sourcespan aprogram =
     match p with
-    | Program (_, [], body, _) -> AProgram ([], helpA body, ())
+    | Program (_, [], body, t) -> AProgram ([], helpA body, (get_sourcespan t))
     | Program _ -> raise (InternalCompilerError "anf found decls when they should have been desugared away!")
-  and helpC (e : tag expr) : unit cexpr * unit anf_bind list =
+  and helpC (e : tag expr) : sourcespan cexpr * sourcespan anf_bind list =
     match e with
-    | EString (s, _) -> CString(s, ()), []
+    | EString (s, t) -> CString(s, (get_sourcespan t)), []
     | EAnnot (e, _, _) -> helpC e
-    | EPrim1 (op, _, arg, _) ->
+    | EPrim1 (op, _, arg, t) ->
       let arg_imm, arg_setup = helpI arg in
-      CPrim1 (op, arg_imm, ()), arg_setup
-    | EPrim2 (((And | Or) as op), _, left, right, tag) -> CPrim2 (op, helpA left, helpA right, ()), []
-    | EPrim2 (op, _, left, right, _) ->
+      CPrim1 (op, arg_imm, (get_sourcespan t)), arg_setup
+    | EPrim2 (((And | Or) as op), _, left, right, t) -> CPrim2 (op, helpA left, helpA right, (get_sourcespan t)), []
+    | EPrim2 (op, _, left, right, t) ->
       let left_imm, left_setup = helpI left in
       let right_imm, right_setup = helpI right in
-      CPrim2 (op, ACExpr (CImmExpr left_imm), ACExpr (CImmExpr right_imm), ()), left_setup @ right_setup
-    | EIf (cond, _then, _else, _) ->
+      CPrim2 (op, ACExpr (CImmExpr left_imm), ACExpr (CImmExpr right_imm), (get_sourcespan t)), left_setup @ right_setup
+    | EIf (cond, _then, _else, t) ->
       let cond_imm, cond_setup = helpI cond in
-      CIf (cond_imm, helpA _then, helpA _else, ()), cond_setup
+      CIf (cond_imm, helpA _then, helpA _else, (get_sourcespan t)), cond_setup
     | ELet ([], body, _) -> helpC body
     | ELet ((BBlank (_, _), exp, _) :: rest, body, pos) ->
       let exp_ans, exp_setup = helpC exp in
@@ -280,7 +280,7 @@ let anf (p : tag program) : unit aprogram =
       let new_binds, new_setup = List.split new_binds_setup in
       let body_ans, body_setup = helpC body in
       body_ans, BLetRec (List.combine names new_binds) :: body_setup
-    | ELambda (args, body, _) ->
+    | ELambda (args, body, t) ->
       let processBind bind =
         match bind with
         | BName (name, _, _) -> name
@@ -290,101 +290,101 @@ let anf (p : tag program) : unit aprogram =
             (InternalCompilerError
                (sprintf "Encountered a non-simple binding in ANFing a lambda: %s" (string_of_bind bind)))
       in
-      CLambda (List.map processBind args, helpA body, ()), []
+      CLambda (List.map processBind args, helpA body, (get_sourcespan t)), []
     | ELet ((BTuple (binds, _), exp, _) :: rest, body, pos) ->
       raise (InternalCompilerError "Tuple bindings should have been desugared away")
-    | EApp (func, args, native, _) ->
+    | EApp (func, args, native, t) ->
       let func_ans, func_setup = helpI func in
       let new_args, new_setup = List.split (List.map helpI args) in
-      CApp (func_ans, new_args, native, ()), func_setup @ List.concat new_setup
+      CApp (func_ans, new_args, native, (get_sourcespan t)), func_setup @ List.concat new_setup
     | ESeq (e1, e2, _) ->
       let e1_ans, e1_setup = helpC e1 in
       let e2_ans, e2_setup = helpC e2 in
       e2_ans, e1_setup @ [ BSeq e1_ans ] @ e2_setup
-    | ETuple (args, _) ->
+    | ETuple (args, t) ->
       let new_args, new_setup = List.split (List.map helpI args) in
-      CTuple (new_args, ()), List.concat new_setup
-    | EGetItem (tup, idx, len, _) ->
+      CTuple (new_args, (get_sourcespan t)), List.concat new_setup
+    | EGetItem (tup, idx, len, t) ->
       let tup_imm, tup_setup = helpI tup in
-      CGetItem (tup_imm, idx, ()), tup_setup
-    | ESetItem (tup, idx, len, newval, _) ->
+      CGetItem (tup_imm, idx, (get_sourcespan t)), tup_setup
+    | ESetItem (tup, idx, len, newval, t) ->
       let tup_imm, tup_setup = helpI tup in
       let new_imm, new_setup = helpI newval in
-      CSetItem (tup_imm, idx, new_imm, ()), tup_setup @ new_setup
-    | ETryCatch(e1, n, e2, _) -> CTryCatch(helpA e1, n, helpA e2, ()), [] 
-    | EThrow(n, _) -> CThrow(n, ()), [] 
+      CSetItem (tup_imm, idx, new_imm, (get_sourcespan t)), tup_setup @ new_setup
+    | ETryCatch(e1, n, e2, t) -> CTryCatch(helpA e1, n, helpA e2, (get_sourcespan t)), [] 
+    | EThrow(n, t) -> CThrow(n, (get_sourcespan t)), [] 
     | _ ->
       let imm, setup = helpI e in
       CImmExpr imm, setup
-  and helpI (e : tag expr) : unit immexpr * unit anf_bind list =
+  and helpI (e : tag expr) : sourcespan immexpr * sourcespan anf_bind list =
     match e with
     | EString (s, tag) -> 
-    let tmp = sprintf "string_%d" tag in 
-    ImmId(tmp, ()), [BLet(tmp, CString(s, ()))]
-    | ENumber (n, _) -> ImmNum (n, ()), []
-    | EBool (b, _) -> ImmBool (b, ()), []
-    | EId (name, _) -> ImmId (name, ()), []
-    | ENil _ -> ImmNil (), []
+    let tmp = sprintf "string_%d" (get_int tag) in 
+    ImmId(tmp, (get_sourcespan tag)), [BLet(tmp, CString(s, (get_sourcespan tag)))]
+    | ENumber (n, t) -> ImmNum (n, (get_sourcespan t)), []
+    | EBool (b, t) -> ImmBool (b, (get_sourcespan t)), []
+    | EId (name, t) -> ImmId (name, (get_sourcespan t)), []
+    | ENil (_, t) -> ImmNil (get_sourcespan t), []
     | EAnnot (e, _, _) -> helpI e
     | ESeq (e1, e2, _) ->
       let e1_imm, e1_setup = helpI e1 in
       let e2_imm, e2_setup = helpI e2 in
       e2_imm, e1_setup @ e2_setup
     | ETuple (args, tag) ->
-      let tmp = sprintf "tup_%d" tag in
+      let tmp = sprintf "tup_%d" (get_int tag) in
       let new_args, new_setup = List.split (List.map helpI args) in
-      ImmId (tmp, ()), List.concat new_setup @ [ BLet (tmp, CTuple (new_args, ())) ]
+      ImmId (tmp, (get_sourcespan tag)), List.concat new_setup @ [ BLet (tmp, CTuple (new_args, (get_sourcespan tag))) ]
     | EGetItem (tup, idx, len, tag) ->
-      let tmp = sprintf "get_%d" tag in
+      let tmp = sprintf "get_%d" (get_int tag) in
       let tup_imm, tup_setup = helpI tup in
-      ImmId (tmp, ()), tup_setup @ [ BLet (tmp, CGetItem (tup_imm, idx, ())) ]
+      ImmId (tmp, (get_sourcespan tag)), tup_setup @ [ BLet (tmp, CGetItem (tup_imm, idx, (get_sourcespan tag))) ]
     | ESetItem (tup, idx, len, newval, tag) ->
-      let tmp = sprintf "set_%d" tag in
+      let tmp = sprintf "set_%d" (get_int tag) in
       let tup_imm, tup_setup = helpI tup in
       let new_imm, new_setup = helpI newval in
-      ImmId (tmp, ()), tup_setup @ new_setup @ [ BLet (tmp, CSetItem (tup_imm, idx, new_imm, ())) ]
+      ImmId (tmp, (get_sourcespan tag)), tup_setup @ new_setup @ [ BLet (tmp, CSetItem (tup_imm, idx, new_imm, (get_sourcespan tag))) ]
     | ETryCatch(e1, n, e2, tag) -> 
-      let tmp = sprintf "trycatch_%d" tag in 
-      ImmId(tmp, ()), [ BLet(tmp, CTryCatch(helpA e1, n, helpA e2, ()))]
+      let tmp = sprintf "trycatch_%d" (get_int tag) in 
+      ImmId(tmp, (get_sourcespan tag)), [ BLet(tmp, CTryCatch(helpA e1, n, helpA e2, (get_sourcespan tag)))]
     | EThrow(n, tag) -> 
-      let tmp = sprintf "throw_%d" tag in 
-      ImmId(tmp, ()), [BLet(tmp, CThrow(n, ()))]
+      let tmp = sprintf "throw_%d" (get_int tag) in 
+      ImmId(tmp, (get_sourcespan tag)), [BLet(tmp, CThrow(n, (get_sourcespan tag)))]
     | EPrim1 (op, _, arg, tag) ->
-      let tmp = sprintf "unary_%d" tag in
+      let tmp = sprintf "unary_%d" (get_int tag) in
       let arg_imm, arg_setup = helpI arg in
-      ImmId (tmp, ()), arg_setup @ [ BLet (tmp, CPrim1 (op, arg_imm, ())) ]
+      ImmId (tmp, (get_sourcespan tag)), arg_setup @ [ BLet (tmp, CPrim1 (op, arg_imm, (get_sourcespan tag))) ]
     | EPrim2 (((And | Or) as op), _, left, right, tag) ->
-      let tmp = sprintf "binop_and_or_%d" tag in
-      ImmId (tmp, ()), [ BLet (tmp, CPrim2 (op, helpA left, helpA right, ())) ]
+      let tmp = sprintf "binop_and_or_%d" (get_int tag) in
+      ImmId (tmp, (get_sourcespan tag)), [ BLet (tmp, CPrim2 (op, helpA left, helpA right, (get_sourcespan tag))) ]
     | EPrim2 (op, _, left, right, tag) ->
-      let tmp = sprintf "binop_%d" tag in
+      let tmp = sprintf "binop_%d" (get_int tag) in
       let left_imm, left_setup = helpI left in
       let right_imm, right_setup = helpI right in
-      ( ImmId (tmp, ())
+      ( ImmId (tmp, (get_sourcespan tag))
       , left_setup
         @ right_setup
-        @ [ BLet (tmp, CPrim2 (op, ACExpr (CImmExpr left_imm), ACExpr (CImmExpr right_imm), ())) ] )
+        @ [ BLet (tmp, CPrim2 (op, ACExpr (CImmExpr left_imm), ACExpr (CImmExpr right_imm), (get_sourcespan tag))) ] )
     | EIf (cond, _then, _else, tag) ->
-      let tmp = sprintf "if_%d" tag in
+      let tmp = sprintf "if_%d" (get_int tag) in
       let cond_imm, cond_setup = helpI cond in
-      ImmId (tmp, ()), cond_setup @ [ BLet (tmp, CIf (cond_imm, helpA _then, helpA _else, ())) ]
+      ImmId (tmp, (get_sourcespan tag)), cond_setup @ [ BLet (tmp, CIf (cond_imm, helpA _then, helpA _else, (get_sourcespan tag))) ]
     | EApp (func, args, native, tag) ->
-      let tmp = sprintf "app_%d" tag in
+      let tmp = sprintf "app_%d" (get_int tag) in
       let new_func, func_setup = helpI func in
       let new_args, new_setup = List.split (List.map helpI args) in
-      ImmId (tmp, ()), func_setup @ List.concat new_setup @ [ BLet (tmp, CApp (new_func, new_args, native, ())) ]
+      ImmId (tmp, (get_sourcespan tag)), func_setup @ List.concat new_setup @ [ BLet (tmp, CApp (new_func, new_args, native, (get_sourcespan tag))) ]
     | EGenApp (func, _, args, native, tag) ->
-      let tmp = sprintf "app_%d" tag in
+      let tmp = sprintf "app_%d" (get_int tag) in
       let new_func, func_setup = helpI func in
       let new_args, new_setup = List.split (List.map helpI args) in
-      ImmId (tmp, ()), func_setup @ List.concat new_setup @ [ BLet (tmp, CApp (new_func, new_args, native, ())) ]
+      ImmId (tmp, (get_sourcespan tag)), func_setup @ List.concat new_setup @ [ BLet (tmp, CApp (new_func, new_args, native, (get_sourcespan tag))) ]
     | ELet ([], body, _) -> helpI body
     | ELet ((BBlank (_, _), exp, _) :: rest, body, pos) ->
       let exp_ans, exp_setup = helpC exp in
       let body_ans, body_setup = helpI (ELet (rest, body, pos)) in
       body_ans, exp_setup @ [ BSeq exp_ans ] @ body_setup
     | ELetRec (binds, body, tag) ->
-      let tmp = sprintf "lam_%d" tag in
+      let tmp = sprintf "lam_%d" (get_int tag) in
       let processBind (bind, rhs, _) =
         match bind with
         | BName (name, _, _) -> name, helpC rhs
@@ -396,10 +396,10 @@ let anf (p : tag program) : unit aprogram =
       let names, new_binds_setup = List.split (List.map processBind binds) in
       let new_binds, new_setup = List.split new_binds_setup in
       let body_ans, body_setup = helpC body in
-      ( ImmId (tmp, ())
+      ( ImmId (tmp, (get_sourcespan tag))
       , List.concat new_setup @ [ BLetRec (List.combine names new_binds) ] @ body_setup @ [ BLet (tmp, body_ans) ] )
     | ELambda (args, body, tag) ->
-      let tmp = sprintf "lam_%d" tag in
+      let tmp = sprintf "lam_%d" (get_int tag) in
       let processBind bind =
         match bind with
         | BName (name, _, _) -> name
@@ -409,7 +409,7 @@ let anf (p : tag program) : unit aprogram =
             (InternalCompilerError
                (sprintf "Encountered a non-simple binding in ANFing a lambda: %s" (string_of_bind bind)))
       in
-      ImmId (tmp, ()), [ BLet (tmp, CLambda (List.map processBind args, helpA body, ())) ]
+      ImmId (tmp, (get_sourcespan tag)), [ BLet (tmp, CLambda (List.map processBind args, helpA body, (get_sourcespan tag))) ]
     | ELet ((BName (bind, _, _), exp, _) :: rest, body, pos) ->
       let exp_ans, exp_setup = helpC exp in
       let body_ans, body_setup = helpI (ELet (rest, body, pos)) in
@@ -417,14 +417,15 @@ let anf (p : tag program) : unit aprogram =
     | ELet ((BTuple (binds, _), exp, _) :: rest, body, pos) ->
       raise (InternalCompilerError "Tuple bindings should have been desugared away")
     | ETryCatchFinally _ -> raise (NotYetImplemented "ETryCatchFinally")
-  and helpA e : unit aexpr =
+  and helpA e : sourcespan aexpr =
+  (* TODO: loc: Could have Bseq, blet, and bletrec hold spans! *)
     let ans, ans_setup = helpC e in
     List.fold_right
       (fun bind body ->
         match bind with
-        | BSeq exp -> ASeq (exp, body, ())
-        | BLet (name, exp) -> ALet (name, exp, body, ())
-        | BLetRec names -> ALetRec (names, body, ()))
+        | BSeq exp -> ASeq (exp, body, (dummy_span))
+        | BLet (name, exp) -> ALet (name, exp, body, (dummy_span))
+        | BLetRec names -> ALetRec (names, body, (dummy_span)))
       ans_setup
       (ACExpr ans)
   in
@@ -1161,8 +1162,8 @@ and compile_lam_helper
   match e with
   | CLambda (args, body, tag) ->
     (* Labels used for the lambda: *)
-    let end_label = sprintf "lambda_end_%d" tag in
-    let lambda_label = sprintf "lambda_%d" tag in
+    let end_label = sprintf "lambda_end_%d" (get_int tag) in
+    let lambda_label = sprintf "lambda_%d" (get_int tag) in
     (* The location of this function on the stack (by our calling convention functions
      * are always passed as the last argument to themselves) *)
     let self_location = get_fn_arg_asm (List.length args) in
@@ -1197,7 +1198,7 @@ and compile_lam_helper
       List.mapi (fun i rv -> RegOffset (i + 3 + List.length free_vars, R15)) reserved_args
     in
     let code =
-      [ ILineComment (sprintf "Define lambda-%d {" tag); IJmp (Label end_label); ILabel lambda_label ]
+      [ ILineComment (sprintf "Define lambda-%d {" (get_int tag)); IJmp (Label end_label); ILabel lambda_label ]
       @ generate_stack_setup body (List.length (free_vars @ reserved_args)) true
       @ [ ILineComment
             "Copy the free variables off the heap onto the stack where they can be used by the body of the lambda {"
@@ -1228,13 +1229,13 @@ and compile_lam_helper
       @ [ IMov(Reg RAX, Reg reserved_temp_register_1)
         ; ILeave
         ; IRet
-        ; ILineComment (sprintf "} define lambda-%d" tag)
+        ; ILineComment (sprintf "} define lambda-%d" (get_int tag))
         ; ILabel end_label
         ; ILineComment
             (sprintf "Check if we have space on the heap to store our function of size %Ld: " function_size_on_heap)
         ]
       @ reserve function_size_on_heap tag
-      @ [ ILineComment (sprintf "Store lambda-%d on the heap {" tag)
+      @ [ ILineComment (sprintf "Store lambda-%d on the heap {" (get_int tag))
           (* We store the arity and number of closed over variables as snake integers *)
         ; IInstrComment
             ( IMov
@@ -1274,7 +1275,7 @@ and compile_lam_helper
           (fun loc -> IInstrComment (IMov (loc, Reg RAX), "Fill in the gap in a previously defined lambda"))
           other_locations
       @ [ IInstrComment (IAdd (Reg reserved_heap_reg, Const function_size_on_heap), "Bump the heap register")
-        ; ILineComment (sprintf "} store lambda-%d" tag)
+        ; ILineComment (sprintf "} store lambda-%d" (get_int tag))
         ]
     in
     code, used_heap_slots, List.combine reserved_args reserved_arg_heap_locations
@@ -1301,8 +1302,8 @@ and compile_cexpr (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
       ; IAdd (Reg reserved_heap_reg, Const string_size_on_heap)
       ]
   | CIf (cond, thn, els, tag) ->
-    let else_label = sprintf "if_false_%d" tag in
-    let done_label = sprintf "done_%d" tag in
+    let else_label = sprintf "if_false_%d" (get_int tag) in
+    let done_label = sprintf "done_%d" (get_int tag) in
     [ IMov (Reg RAX, compile_imm cond env) ]
     @ compile_assert_is_bool (Reg RAX) assertion_failed_if_not_bool was_typechecked
     @ [ ICmp (Reg RAX, const_true); IJne (Label else_label) ]
@@ -1386,8 +1387,8 @@ and compile_cexpr (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
     let code, _, _ = compile_lam_helper e env was_typechecked [] [] None in
     code
  | CTryCatch (body, exn, catch, tag) ->
-   let catch_start = sprintf "trycatch_start_%d" tag in
-   let catch_end = sprintf "trycatch_end_%d" tag in
+   let catch_start = sprintf "trycatch_start_%d" (get_int tag) in
+   let catch_end = sprintf "trycatch_end_%d" (get_int tag) in
    (* Add this exception handler to the exception handler table before running the body *)
    compile_native_call "add_to_exn_table" [ compile_exn exn; Label catch_start ]
    @ compile_aexpr body si env num_args was_typechecked
@@ -1405,8 +1406,8 @@ and compile_cexpr (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
    @ [ ILabel catch_end ]
 
  | CThrow (exn, tag) ->
-   let done_leaving = sprintf "cthrow_done_leaving_%d" tag in
-   let loop_start = sprintf "cthrow_loop_start_%d" tag in
+   let done_leaving = sprintf "cthrow_done_leaving_%d" (get_int tag) in
+   let loop_start = sprintf "cthrow_loop_start_%d" (get_int tag) in
    (* Get the depth of the handler by calling into the runtime *) 
    compile_native_call "get_exn_depth" [ compile_exn exn ]
    (* A small assembly gadget to `leave` n times *) 
@@ -1473,8 +1474,8 @@ and compile_prim1 (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
   | CPrim1 (IsBool, body, tag) ->
     (* Note that we have to use branching here since we want to verify that it is bool where a bool
        is either 0x7FFF...FFF or 0xFFF...FFF *)
-    let found_bool = sprintf "_is_bool_found_bool_%d" tag in
-    let done_label = sprintf "_is_bool_done_%d" tag in
+    let found_bool = sprintf "_is_bool_found_bool_%d" (get_int tag) in
+    let done_label = sprintf "_is_bool_done_%d" (get_int tag) in
     [ IMov (Reg RAX, compile_imm body env)
     ; ILineComment "IsBool(...)"
     ; ICmp (Reg RAX, const_true)
@@ -1501,8 +1502,8 @@ and compile_prim1 (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
     ; IOr (Reg RAX, const_false)
     ]
   | CPrim1 (IsTuple, body, tag) ->
-    let true_label = sprintf "is_tuple_true_%d" tag in
-    let done_label = sprintf "is_tuple_done_%d" tag in
+    let true_label = sprintf "is_tuple_true_%d" (get_int tag) in
+    let done_label = sprintf "is_tuple_done_%d" (get_int tag) in
     [ IMov (Reg RAX, compile_imm body env)
     ; ILineComment "IsBool(...)"
     ; IShl (Reg RAX, Const 61L)
@@ -1563,7 +1564,7 @@ and compile_prim2 (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
     @ [ IJo (Label overflow_label) ]
   (* And, Or short circuit evaluation of their LHS and RHS *)
   | CPrim2 (Or, lhs, rhs, tag) ->
-    let done_label = sprintf "or_done_%d" tag in
+    let done_label = sprintf "or_done_%d" (get_int tag) in
     [ ILineComment "or_lhs {" ]
     @ compile_aexpr lhs si env num_args was_typechecked
     @ [ ILineComment "} or_lhs" ]
@@ -1579,7 +1580,7 @@ and compile_prim2 (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
       ; ILabel done_label
       ]
   | CPrim2 (And, lhs, rhs, tag) ->
-    let done_label = sprintf "and_done_%d" tag in
+    let done_label = sprintf "and_done_%d" (get_int tag) in
     [ ILineComment "and_lhs {" ]
     @ compile_aexpr lhs si env num_args was_typechecked
     @ [ ILineComment "} and_lhs" ]
@@ -1595,8 +1596,8 @@ and compile_prim2 (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
       ; ILabel done_label
       ]
   | CPrim2 (((Greater | GreaterEq | Less | LessEq | Eq) as op), lhs, rhs, tag) ->
-    let cmp_fail_label = sprintf "_cmp_fail_%d" tag in
-    let cmp_done_label = sprintf "_cmp_done_%d" tag in
+    let cmp_fail_label = sprintf "_cmp_fail_%d" (get_int tag) in
+    let cmp_done_label = sprintf "_cmp_done_%d" (get_int tag) in
     let assertions =
       (* The Eq operator functions on any type, while all the other operators can only be used on integers *)
       match op with
@@ -1700,8 +1701,8 @@ and compile_assert_has_tag (tag : int64) (v : arg) (error_label : string) (was_t
           ]
       | Sized (_, arg) -> compile_assert_has_tag tag arg error_label was_typechecked))
 
-and reserve (size : int64) (tag : int) =
-  let ok = sprintf "memcheck_ok_%d" tag in
+and reserve (size : int64) (tag : tag) =
+  let ok = sprintf "memcheck_ok_%d" (get_int tag) in
   [ IInstrComment
       (IMov (Reg RAX, LabelContents "HEAP_END"), sprintf "Reserving %Ld words" (Int64.div size (Int64.of_int word_size)))
   ; ISub (Reg RAX, Const size)

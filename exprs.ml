@@ -3,10 +3,12 @@ open Printf
 let show_debug_print = ref false
 let debug_printf fmt = if !show_debug_print then printf fmt else ifprintf stdout fmt
 
-type tag = int
 type sourcespan = Lexing.position * Lexing.position
+(* A tag is a unique int and a sourcespan  *)
+type tag = int * sourcespan
+  let get_sourcespan t = (let (_, s) = t in s) 
+  let get_int t = (let (i, _) = t in i) 
 
-let dummpy_span = Lexing.dummy_pos, Lexing.dummy_pos
 
 type prim1 =
   | Add1
@@ -300,11 +302,11 @@ and map_tag_P (f : 'a -> 'b) p =
     Program (tag_tydecls, tag_decls, tag_body, tag_a)
 ;;
 
-let tag (p : 'a program) : tag program =
+let tag (p : sourcespan program) : tag program =
   let next = ref 0 in
-  let tag _ =
+  let tag s =
     next := !next + 1;
-    !next
+    (!next, s)
   in
   map_tag_P tag p
 ;;
@@ -314,15 +316,6 @@ let combine_tags (f1 : 'a -> 'b) (f2 : 'a -> 'c) (p : 'a program) : ('b * 'c) pr
 ;;
 
 let tag_and_map (f : 'a -> 'b) (p : 'a program) : ('a * 'b) program = map_tag_P (fun a -> a, f a) p
-
-let prog_and_tag (p : 'a program) : ('a * tag) program =
-  let next = ref 0 in
-  let tag _ =
-    next := !next + 1;
-    !next
-  in
-  tag_and_map tag p
-;;
 
 let rec untagP (p : 'a program) : unit program =
   match p with
@@ -387,70 +380,70 @@ and untagTD td =
   | ExceptionDecl(n, _) -> ExceptionDecl(n, ())
 ;;
 
-let atag (p : 'a aprogram) : tag aprogram =
+let atag (p : sourcespan aprogram) : tag aprogram =
   let next = ref 0 in
-  let tag () =
+  let tag s =
     next := !next + 1;
-    !next
+    (!next, s)
   in
   let rec helpA (e : 'a aexpr) : tag aexpr =
     match e with
-    | ASeq (e1, e2, _) ->
-      let seq_tag = tag () in
+    | ASeq (e1, e2, s) ->
+      let seq_tag = tag s in
       ASeq (helpC e1, helpA e2, seq_tag)
-    | ALet (x, c, b, _) ->
-      let let_tag = tag () in
+    | ALet (x, c, b, s) ->
+      let let_tag = tag s in
       ALet (x, helpC c, helpA b, let_tag)
-    | ALetRec (xcs, b, _) ->
-      let let_tag = tag () in
+    | ALetRec (xcs, b, s) ->
+      let let_tag = tag s in
       ALetRec (List.map (fun (x, c) -> x, helpC c) xcs, helpA b, let_tag)
     | ACExpr c -> ACExpr (helpC c)
   and helpC (c : 'a cexpr) : tag cexpr =
     match c with
-    | CThrow(n, _) -> CThrow(n, tag ())
-    | CTryCatch(e1, n, e2, _) -> 
-    let t = tag () in 
+    | CThrow(n, s) -> CThrow(n, tag s)
+    | CTryCatch(e1, n, e2, s) -> 
+    let t = tag s in 
     CTryCatch(helpA e1, n, helpA e2, t)
-    | CPrim1 (op, e, _) ->
-      let prim_tag = tag () in
+    | CPrim1 (op, e, s) ->
+      let prim_tag = tag s in
       CPrim1 (op, helpI e, prim_tag)
-    | CPrim2 (op, e1, e2, _) ->
-      let prim_tag = tag () in
+    | CPrim2 (op, e1, e2, s) ->
+      let prim_tag = tag s in
       CPrim2 (op, helpA e1, helpA e2, prim_tag)
-    | CIf (cond, thn, els, _) ->
-      let if_tag = tag () in
+    | CIf (cond, thn, els, s) ->
+      let if_tag = tag s in
       CIf (helpI cond, helpA thn, helpA els, if_tag)
-    | CApp (func, args, native, _) ->
-      let app_tag = tag () in
+    | CApp (func, args, native, s) ->
+      let app_tag = tag s in
       CApp (helpI func, List.map helpI args, native, app_tag)
     | CImmExpr i -> CImmExpr (helpI i)
-    | CTuple (es, _) ->
-      let tup_tag = tag () in
+    | CTuple (es, s) ->
+      let tup_tag = tag s in
       CTuple (List.map helpI es, tup_tag)
-    | CGetItem (e, idx, _) ->
-      let get_tag = tag () in
+    | CGetItem (e, idx, s) ->
+      let get_tag = tag s in
       CGetItem (helpI e, idx, get_tag)
-    | CSetItem (e, idx, newval, _) ->
-      let set_tag = tag () in
+    | CSetItem (e, idx, newval, s) ->
+      let set_tag = tag s in
       CSetItem (helpI e, idx, helpI newval, set_tag)
-    | CLambda (args, body, _) ->
-      let lam_tag = tag () in
+    | CLambda (args, body, s) ->
+      let lam_tag = tag s in
       CLambda (args, helpA body, lam_tag)
-    | CString (s, _) -> CString(s, tag ())
+    | CString (s, n) -> CString(s, tag n)
   and helpI (i : 'a immexpr) : tag immexpr =
     match i with
-    | ImmNil _ -> ImmNil (tag ())
-    | ImmId (x, _) -> ImmId (x, tag ())
-    | ImmNum (n, _) -> ImmNum (n, tag ())
-    | ImmBool (b, _) -> ImmBool (b, tag ())
+    | ImmNil s -> ImmNil (tag s)
+    | ImmId (x, s) -> ImmId (x, tag s)
+    | ImmNum (n, s) -> ImmNum (n, tag s)
+    | ImmBool (b, s) -> ImmBool (b, tag s)
   and helpD d =
     match d with
-    | ADFun (name, args, body, _) ->
-      let fun_tag = tag () in
+    | ADFun (name, args, body, s) ->
+      let fun_tag = tag s in
       ADFun (name, args, helpA body, fun_tag)
   and helpP p =
     match p with
-    | AProgram (decls, body, _) -> AProgram (List.map helpD decls, helpA body, 0)
+    | AProgram (decls, body, s) -> AProgram (List.map helpD decls, helpA body, (0, s))
   in
   helpP p
 ;;
