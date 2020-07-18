@@ -1209,14 +1209,13 @@ and compile_lam_helper
       [ ILineComment (sprintf "Define lambda-%d {" (get_int tag)); IJmp (Label end_label); ILabel lambda_label ]
       @ generate_stack_setup body (List.length (free_vars @ reserved_args)) true
       @ [ ILineComment
-            "Copy the free variables off the heap onto the stack where they can be used by the body of the lambda {"
-        ; IInstrComment
-            ( IMov (Reg RAX, self_location)
-            , "Move the last argument of the function which is the function itself into RAX so we "
-              ^ "can unpack closed over values" )
-        ; IInstrComment
-            ( ISub (Reg RAX, HexConst closure_tag)
-            , "And detag it. Our compiler guarantees that it will be a lambda so no need to tag check" )
+            "Copy the free variables off the heap onto the stack "
+          ; ILineComment "where they can be used by the body of the lambda {"
+        ; ILineComment "Start by moving the last argument of the function which is the"
+        ; ILineComment "function itself into RAX so we can unpack the closed over values:"
+        ;              IMov (Reg RAX, self_location)
+        ; ILineComment "And detag it. Our invariant is that it is lambda so no need to tag check:"
+            ; ISub (Reg RAX, HexConst closure_tag)
         ]
       @ List.flatten
           (List.mapi
