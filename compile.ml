@@ -1776,7 +1776,7 @@ and compile_fun_app (e : tag cexpr) (env : arg envt) (was_typechecked : bool) : 
       then
         [ IInstrComment
             ( IMov (Sized (QWORD_PTR, RegOffset (List.length args + 1, RSP)), HexConst 0L)
-            , "Fill in the padded argument with a zero so all stack memory is padded with zeros" )
+            , "Fill in the padded argument with a zero for padding" )
         ]
       else [])
     @ [ IInstrComment
@@ -1811,50 +1811,50 @@ let compile_prog (was_typechecked : bool) (anfed : tag aprogram) : string =
       [ ILeave
       ; IRet
       ; ILineComment "Error labels: "
-      ; IInstrComment
-          (ILabel assertion_failed_arith_not_num, "Assertion failed, found a not-number when doing arithmetic")
+      ; 
+          (ILabel assertion_failed_arith_not_num)
       ; IMov (Reg RDI, Const err_ARITH_NOT_NUM)
       ; ICall (Label "error")
-      ; IInstrComment
-          (ILabel assertion_failed_comparison_not_num, "Assertion failed, found a not-number when doing a comparison")
+      ; 
+          (ILabel assertion_failed_comparison_not_num)
       ; IMov (Reg RDI, Const err_COMP_NOT_NUM)
       ; ICall (Label "error")
-      ; IInstrComment
-          (ILabel assertion_failed_if_not_bool, "Assertion failed, found a not-boolean as a condition in an if")
+      ; 
+          (ILabel assertion_failed_if_not_bool)
       ; IMov (Reg RDI, Const err_IF_NOT_BOOL)
       ; ICall (Label "error")
-      ; IInstrComment
-          (ILabel assertion_failed_logic_not_bool, "Assertion failed, found a not-boolean when doing boolean logic")
+      ; 
+          (ILabel assertion_failed_logic_not_bool)
       ; IMov (Reg RDI, Const err_LOGIC_NOT_BOOL)
       ; ICall (Label "error")
-      ; IInstrComment (ILabel overflow_label, "Call the error function when an integer overflow is detected")
+      ;  (ILabel overflow_label)
       ; IMov (Reg RDI, Const err_OVERFLOW)
       ; ICall (Label "error")
-      ; IInstrComment (ILabel assertion_failed_not_tuple, "Assertion failed, expected a tuple")
+      ;  (ILabel assertion_failed_not_tuple)
       ; IMov (Reg RDI, Const err_GET_NOT_TUPLE)
       ; ICall (Label "error")
-      ; IInstrComment (ILabel assertion_failed_get_index_too_large, "Assertion failed, tuple index too large")
+      ; (ILabel assertion_failed_get_index_too_large)
       ; IMov (Reg RDI, Const err_GET_HIGH_INDEX)
       ; ICall (Label "error")
-      ; IInstrComment (ILabel assertion_failed_get_index_too_small, "Assertion failed, tuple index too small")
+      ;  (ILabel assertion_failed_get_index_too_small)
       ; IMov (Reg RDI, Const err_GET_LOW_INDEX)
       ; ICall (Label "error")
-      ; IInstrComment (ILabel assertion_failed_index_nil, "Assertion failed, indexed into a tuple")
+      ;  (ILabel assertion_failed_index_nil)
       ; IMov (Reg RDI, Const err_NIL_DEREF)
       ; ICall (Label "error")
-      ; IInstrComment (ILabel assertion_failed_no_more_heap_space, "Assertion failed, out of space on our heap")
+      ;  (ILabel assertion_failed_no_more_heap_space)
       ; IMov (Reg RDI, Const err_OUT_OF_MEMORY)
       ; ICall (Label "error")
-      ; IInstrComment (ILabel assertion_failed_not_a_closure, "Assertion failed, tried to call a not-closure")
+      ;  (ILabel assertion_failed_not_a_closure)
       ; IMov (Reg RDI, Const err_CALL_NOT_CLOSURE)
       ; ICall (Label "error")
-      ; IInstrComment
-          (ILabel assertion_failed_arity_error, "Assertion failed, tried to call a function with the wrong arity")
+      ; 
+          (ILabel assertion_failed_arity_error)
       ; IMov (Reg RDI, Const err_CALL_ARITY_ERR)
       ; ICall (Label "error")
-      ; IInstrComment
-          ( ILabel assertion_failed_out_of_stack_memory
-          , "Assertion failed, tried to call a function with the wrong arity" )
+      ; 
+          ( ILabel assertion_failed_out_of_stack_memory)
+         
       ; IMov (Reg RDI, Const err_OUT_OF_STACK_MEMORY)
       ; ICall (Label "error")
       ] in 
