@@ -160,6 +160,10 @@ let get_tag_E e =
   | ESetItem (_, _, _, _, t) -> t
   | ESeq (_, _, t) -> t
   | ELambda (_, _, t) -> t
+  | EString(_, t) -> t
+  | ETryCatch(_, _, _, t) -> t
+  | ETryCatchFinally(_, _, _, _, t) -> t
+  | EThrow(_, t) -> t 
 ;;
 
 let get_tag_D d =
@@ -192,6 +196,12 @@ let rec map_tag_E (f : 'a -> 'b) (e : 'a expr) =
     let tag_e1 = map_tag_E f e1 in
     let tag_e2 = map_tag_E f e2 in
     ETryCatch (tag_e1, n, tag_e2, tag_prim)
+  | ETryCatchFinally (e1, n, e2, e3, a) ->
+    let tag_prim = f a in
+    let tag_e1 = map_tag_E f e1 in
+    let tag_e2 = map_tag_E f e2 in
+    let tag_e3 = map_tag_E f e3 in
+    ETryCatchFinally (tag_e1, n, tag_e2, tag_e3, tag_prim)
   | EThrow(n, a) -> EThrow(n, f a)
   | ELet (binds, body, a) ->
     let tag_let = f a in
@@ -278,6 +288,7 @@ and map_tag_TD (f : 'a -> 'b) td =
   | TyDecl (name, tyargs_opt, args, a) ->
     let tag_a = f a in
     TyDecl (name, tyargs_opt, List.map (map_tag_T f) args, tag_a)
+  | ExceptionDecl(name, a) -> ExceptionDecl(name, f a)
 
 and map_tag_P (f : 'a -> 'b) p =
   match p with
@@ -338,6 +349,10 @@ and untagE e =
     EGenApp (untagE func, List.map untagT tyargs, List.map untagE args, native, ())
   | ELetRec (binds, body, _) -> ELetRec (List.map (fun (b, e, _) -> untagB b, untagE e, ()) binds, untagE body, ())
   | ELambda (binds, body, _) -> ELambda (List.map untagB binds, untagE body, ())
+  | EString (s, _) -> EString(s, ())
+  | ETryCatch(e1, n, e2, _) -> ETryCatch(e1, n, e2, ())
+  | ETryCatchFinally(e1, n, e2, e3, _) -> ETryCatchFinally(e1, n, e2, e3, ())
+  | EThrow(n, _) -> EThrow(n, ())
 
 and untagBB ((a, b, c) : 'a binding) = untagB a, untagE b, ()
 
@@ -369,6 +384,7 @@ and untagD d =
 and untagTD td =
   match td with
   | TyDecl (name, tyargs_opt, args, _) -> TyDecl (name, tyargs_opt, List.map untagT args, ())
+  | ExceptionDecl(n, _) -> ExceptionDecl(n, ())
 ;;
 
 let atag (p : 'a aprogram) : tag aprogram =
