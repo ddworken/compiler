@@ -176,7 +176,12 @@ let rec i_to_asm (i : instruction) : string =
   | ITest (arg, comp) -> sprintf "  test %s, %s" (arg_to_asm arg) (arg_to_asm comp)
   | ILineComment str -> sprintf "  ;; %s" str
   | IInstrComment (instr, str) -> sprintf "%s ; %s" (i_to_asm instr) str
-  | ILocationData (instr, locs) -> sprintf "%s ; \t\t\t\t\t#Source_Map:[%s]" (i_to_asm instr) (ExtString.String.join ", " (List.map string_of_sourcespan_without_fn (List.filter (fun (l) -> l <> dummy_span) locs)))
+  | ILocationData (instr, locs) -> 
+    let filtered_locs = List.filter (fun (l) -> l <> dummy_span) locs in 
+    if List.length filtered_locs > 0 then 
+  sprintf "%s ; \t\t\t\t\t#Source_Map:[%s]" (i_to_asm instr) (ExtString.String.join ", " (List.map string_of_sourcespan_without_fn filtered_locs)) 
+  else 
+  (i_to_asm instr)
   | IEnter (slots, depth) -> sprintf "  enter %d, %d" slots depth
   | ILeave -> "  leave"
   | CMovne (a, b) -> sprintf "  cmovne %s, %s" (arg_to_asm a) (arg_to_asm b)
