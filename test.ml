@@ -11,6 +11,10 @@ open Errors
 open Interpreter
 open TypeCheck
 open Phases
+open Anf 
+open Desugar 
+open Rename 
+open WellFormed 
 
 let assert_ok (x : 'a fallible) : 'a =
   match x with
@@ -78,11 +82,11 @@ let trename (name : string) (program : string) (expected : string) =
 ;;
 
 (* Runs a program IN AN INTERPRETER, given as a source string, and compares its output to expected *)
-let ti (name : string) (program : string) (expected : string) =
+(* let ti (name : string) (program : string) (expected : string) =
   name
   >:: fun _ ->
   assert_equal expected (expr_val_to_string (eval_prog (untagP (parse_string name program)))) ~printer:(fun s -> s)
-;;
+;; *)
 
 let t_freevars (name : string) (lam_string : string) (expected : string list) =
   name
@@ -1655,7 +1659,7 @@ let parser_tests =
   ]
 ;;
 
-let interpreter_tests =
+(* let interpreter_tests =
   [ ti "interpret_1" "1 + 2" "3"
   ; ti "interpret_2" "if true: 1 else: 2" "1"
   ; ti "interpret_3" "if false: 1 else: 2" "2"
@@ -1690,7 +1694,7 @@ let interpreter_tests =
   ; ti "interpret_19" "equal((1,(3, false)), (1, (3, false)))" "true"
   ; ti "interpret_20" "equal((1,(3, false)), (1, (3, true)))" "false"
   ]
-;;
+;; *)
 
 let well_formed_failures =
   [ te
@@ -1869,7 +1873,7 @@ let compile_tests =
   @ error_tests
   @ misc_tests
   @ oom_tests
-  @ interpreter_tests
+  (* @ interpreter_tests *)
   @ higher_ordered_functions_tests
   @ gc_tests
   @ string_tests

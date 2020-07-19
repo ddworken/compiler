@@ -169,11 +169,11 @@ and eval_prog (p : 'a program) : unit expr =
 
 (* Main entrypoint. Only runs if there is a single argument specified on argv. Evals the 
    given file and outputs the result to stdout. *)
-let () =
+(* let () =
   if Array.length Sys.argv == 2
   then (
     let data = input_file Sys.argv.(1) in
     let evaled = eval_prog (untagP (parse_string Sys.argv.(1) data)) in
     printf "%s\n" (expr_val_to_string evaled))
   else ()
-;;
+;; *)
