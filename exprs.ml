@@ -4,11 +4,19 @@ let show_debug_print = ref false
 let debug_printf fmt = if !show_debug_print then printf fmt else ifprintf stdout fmt
 
 type sourcespan = Lexing.position * Lexing.position
+
 (* A tag is a unique int and a sourcespan  *)
 type tag = int * sourcespan
-  let get_sourcespan t = (let (_, s) = t in s) 
-  let get_int t = (let (i, _) = t in i) 
 
+let get_sourcespan t =
+  let _, s = t in
+  s
+;;
+
+let get_int t =
+  let i, _ = t in
+  i
+;;
 
 type prim1 =
   | Add1
@@ -23,7 +31,7 @@ type prim2 =
   | Plus
   | Minus
   | Times
-  | Divides 
+  | Divides
   | And
   | Or
   | Greater
@@ -68,18 +76,22 @@ and 'a expr =
   | EBool of bool * 'a
   | ENil of 'a typ * 'a
   | EId of string * 'a
-  | EString of string * 'a 
+  | EString of string * 'a
   | EApp of 'a expr * 'a expr list * call_type * 'a
   | EGenApp of 'a expr * 'a typ list * 'a expr list * call_type * 'a
   | EAnnot of 'a expr * 'a typ * 'a
   | ELambda of 'a bind list * 'a expr * 'a
   | ELetRec of 'a binding list * 'a expr * 'a
-  | ETryCatch of 'a expr * string * 'a expr * 'a 
-  | ETryCatchFinally of 'a expr * string * 'a expr * 'a expr * 'a 
-  | EThrow of string * 'a 
+  | ETryCatch of 'a expr * string * 'a expr * 'a
+  | ETryCatchFinally of 'a expr * string * 'a expr * 'a expr * 'a
+  | EThrow of string * 'a
 
 type 'a decl = DFun of string * 'a bind list * 'a scheme * 'a expr * 'a
-type 'a tydecl = TyDecl of string * string list option * 'a typ list * 'a | ExceptionDecl of string * 'a 
+
+type 'a tydecl =
+  | TyDecl of string * string list option * 'a typ list * 'a
+  | ExceptionDecl of string * 'a
+
 type 'a program = Program of 'a tydecl list * 'a decl list list * 'a expr * 'a
 
 type 'a immexpr =
@@ -100,8 +112,8 @@ and 'a cexpr =
   | CGetItem of 'a immexpr * int * 'a
   | CSetItem of 'a immexpr * int * 'a immexpr * 'a
   | CLambda of string list * 'a aexpr * 'a
-  | CString of string * 'a 
-  | CTryCatch of 'a aexpr * string * 'a aexpr * 'a 
+  | CString of string * 'a
+  | CTryCatch of 'a aexpr * string * 'a aexpr * 'a
   | CThrow of string * 'a
 
 and 'a aexpr =
@@ -162,10 +174,10 @@ let get_tag_E e =
   | ESetItem (_, _, _, _, t) -> t
   | ESeq (_, _, t) -> t
   | ELambda (_, _, t) -> t
-  | EString(_, t) -> t
-  | ETryCatch(_, _, _, t) -> t
-  | ETryCatchFinally(_, _, _, _, t) -> t
-  | EThrow(_, t) -> t 
+  | EString (_, t) -> t
+  | ETryCatch (_, _, _, t) -> t
+  | ETryCatchFinally (_, _, _, _, t) -> t
+  | EThrow (_, t) -> t
 ;;
 
 let get_tag_D d =
@@ -180,7 +192,7 @@ let rec map_tag_E (f : 'a -> 'b) (e : 'a expr) =
   | EGetItem (e, idx, len, a) -> EGetItem (map_tag_E f e, idx, len, f a)
   | ESetItem (e, idx, len, newval, a) -> ESetItem (map_tag_E f e, idx, len, map_tag_E f newval, f a)
   | EId (x, a) -> EId (x, f a)
-  | EString (s, a) -> EString(s, f a)
+  | EString (s, a) -> EString (s, f a)
   | ENumber (n, a) -> ENumber (n, f a)
   | EBool (b, a) -> EBool (b, f a)
   | ENil (t, a) -> ENil (map_tag_T f t, f a)
@@ -204,7 +216,7 @@ let rec map_tag_E (f : 'a -> 'b) (e : 'a expr) =
     let tag_e2 = map_tag_E f e2 in
     let tag_e3 = map_tag_E f e3 in
     ETryCatchFinally (tag_e1, n, tag_e2, tag_e3, tag_prim)
-  | EThrow(n, a) -> EThrow(n, f a)
+  | EThrow (n, a) -> EThrow (n, f a)
   | ELet (binds, body, a) ->
     let tag_let = f a in
     let tag_binding (b, e, t) =
@@ -290,7 +302,7 @@ and map_tag_TD (f : 'a -> 'b) td =
   | TyDecl (name, tyargs_opt, args, a) ->
     let tag_a = f a in
     TyDecl (name, tyargs_opt, List.map (map_tag_T f) args, tag_a)
-  | ExceptionDecl(name, a) -> ExceptionDecl(name, f a)
+  | ExceptionDecl (name, a) -> ExceptionDecl (name, f a)
 
 and map_tag_P (f : 'a -> 'b) p =
   match p with
@@ -306,7 +318,7 @@ let tag (p : sourcespan program) : tag program =
   let next = ref 0 in
   let tag s =
     next := !next + 1;
-    (!next, s)
+    !next, s
   in
   map_tag_P tag p
 ;;
@@ -342,10 +354,10 @@ and untagE e =
     EGenApp (untagE func, List.map untagT tyargs, List.map untagE args, native, ())
   | ELetRec (binds, body, _) -> ELetRec (List.map (fun (b, e, _) -> untagB b, untagE e, ()) binds, untagE body, ())
   | ELambda (binds, body, _) -> ELambda (List.map untagB binds, untagE body, ())
-  | EString (s, _) -> EString(s, ())
-  | ETryCatch(e1, n, e2, _) -> ETryCatch(e1, n, e2, ())
-  | ETryCatchFinally(e1, n, e2, e3, _) -> ETryCatchFinally(e1, n, e2, e3, ())
-  | EThrow(n, _) -> EThrow(n, ())
+  | EString (s, _) -> EString (s, ())
+  | ETryCatch (e1, n, e2, _) -> ETryCatch (e1, n, e2, ())
+  | ETryCatchFinally (e1, n, e2, e3, _) -> ETryCatchFinally (e1, n, e2, e3, ())
+  | EThrow (n, _) -> EThrow (n, ())
 
 and untagBB ((a, b, c) : 'a binding) = untagB a, untagE b, ()
 
@@ -377,14 +389,14 @@ and untagD d =
 and untagTD td =
   match td with
   | TyDecl (name, tyargs_opt, args, _) -> TyDecl (name, tyargs_opt, List.map untagT args, ())
-  | ExceptionDecl(n, _) -> ExceptionDecl(n, ())
+  | ExceptionDecl (n, _) -> ExceptionDecl (n, ())
 ;;
 
 let atag (p : sourcespan aprogram) : tag aprogram =
   let next = ref 0 in
   let tag s =
     next := !next + 1;
-    (!next, s)
+    !next, s
   in
   let rec helpA (e : 'a aexpr) : tag aexpr =
     match e with
@@ -400,10 +412,10 @@ let atag (p : sourcespan aprogram) : tag aprogram =
     | ACExpr c -> ACExpr (helpC c)
   and helpC (c : 'a cexpr) : tag cexpr =
     match c with
-    | CThrow(n, s) -> CThrow(n, tag s)
-    | CTryCatch(e1, n, e2, s) -> 
-    let t = tag s in 
-    CTryCatch(helpA e1, n, helpA e2, t)
+    | CThrow (n, s) -> CThrow (n, tag s)
+    | CTryCatch (e1, n, e2, s) ->
+      let t = tag s in
+      CTryCatch (helpA e1, n, helpA e2, t)
     | CPrim1 (op, e, s) ->
       let prim_tag = tag s in
       CPrim1 (op, helpI e, prim_tag)
@@ -429,7 +441,7 @@ let atag (p : sourcespan aprogram) : tag aprogram =
     | CLambda (args, body, s) ->
       let lam_tag = tag s in
       CLambda (args, helpA body, lam_tag)
-    | CString (s, n) -> CString(s, tag n)
+    | CString (s, n) -> CString (s, tag n)
   and helpI (i : 'a immexpr) : tag immexpr =
     match i with
     | ImmNil s -> ImmNil (tag s)

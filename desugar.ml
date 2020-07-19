@@ -1,9 +1,9 @@
-open Exprs 
-open Phases 
-open Printf 
+open Exprs
+open Phases
+open Printf
 open TypeCheck
 open Errors
-open Pretty 
+open Pretty
 
 let rec list_truncate (l : 'a list) (n : int) : 'a list =
   if n = 0
@@ -29,7 +29,6 @@ let rec extract_typ (b : 'a bind) : 'a typ =
   | BBlank (t, _) -> t
 ;;
 
-
 let desugar (p : sourcespan program) : sourcespan program fallible =
   let gensym =
     let next = ref 0 in
@@ -43,7 +42,7 @@ let desugar (p : sourcespan program) : sourcespan program fallible =
     | ESeq (EAnnot (e1, t, l1), e2, l2) ->
       ELet ([ BBlank (expand_t t tyenv, l1), helpE e1 tyenv, l1 ], helpE e2 tyenv, l2)
     | ESeq (e1, e2, loc) -> ELet ([ BBlank (TyBlank dummy_span, loc), helpE e1 tyenv, loc ], helpE e2 tyenv, loc)
-    | EString (s, loc) -> EString(s, loc)
+    | EString (s, loc) -> EString (s, loc)
     | ENumber (n, loc) -> ENumber (n, loc)
     | EBool (b, loc) -> EBool (b, loc)
     | EId (n, loc) -> EId (n, loc)
@@ -78,8 +77,8 @@ let desugar (p : sourcespan program) : sourcespan program fallible =
     | ELetRec (bindings, body, loc) ->
       let binds = List.map (fun b -> helpBinding b tyenv) bindings in
       ELetRec (List.flatten binds, helpE body tyenv, loc)
-    | ETryCatch(e1, n, e2, loc) -> ETryCatch(helpE e1 tyenv, n, helpE e2 tyenv, loc)
-    | EThrow(n, loc) -> EThrow(n, loc)
+    | ETryCatch (e1, n, e2, loc) -> ETryCatch (helpE e1 tyenv, n, helpE e2 tyenv, loc)
+    | EThrow (n, loc) -> EThrow (n, loc)
     | ETryCatchFinally _ -> raise (NotYetImplemented "ETryCatchFinally")
   and helpBindsFlatten (tuplebind : string) (binds : sourcespan bind list) (tyenv : sourcespan scheme envt)
       : sourcespan binding list
@@ -130,7 +129,7 @@ let desugar (p : sourcespan program) : sourcespan program fallible =
       let new_tyenv_elem = name, SForall (generics_list, TyTup (List.map (fun t -> expand_t t tyenv) typs, loc), loc) in
       let new_tyenv = new_tyenv_elem :: tyenv in
       generate_init_tyenv rest new_tyenv
-    | ExceptionDecl _ :: rest -> generate_init_tyenv rest tyenv 
+    | ExceptionDecl _ :: rest -> generate_init_tyenv rest tyenv
     | [] -> tyenv
   and expand_t (t : sourcespan typ) (tyenv : sourcespan scheme envt) : sourcespan typ =
     match t with

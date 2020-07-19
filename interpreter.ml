@@ -8,7 +8,7 @@ open ExtLib
 open Runner
 open Compile
 open Pretty
-open Errors 
+open Errors
 
 (* Convert the given expression (which must be a number or bool) to a string *)
 let rec expr_val_to_string (e : 'a expr) : string =
@@ -17,7 +17,7 @@ let rec expr_val_to_string (e : 'a expr) : string =
   | EBool (b, _) -> sprintf "%b" b
   | ENil _ -> "nil"
   | ETuple (exprs, _) -> "(" ^ String.join ", " (List.map expr_val_to_string exprs) ^ ")"
-  | ELambda (args, body ,_) -> sprintf "<function arity=%d>" (List.length args)
+  | ELambda (args, body, _) -> sprintf "<function arity=%d>" (List.length args)
   | _ -> failwith "ice6"
 ;;
 
@@ -83,14 +83,14 @@ let rec eval (expr : 'a expr) (env : (string * unit expr) list) (functions : 'a 
   | ELet ((BTuple (_, _), e, _) :: rest, b, _) -> failwith "nyi"
   | ELet ([], b, _) -> eval b env functions
   | EIf (c, t, f, _) -> if eval_to_bool c env functions then eval t env functions else eval f env functions
-  | EApp (EId("equal", _), arg_values, _, _) ->
+  | EApp (EId ("equal", _), arg_values, _, _) ->
     if List.length arg_values != 2
     then failwith "ice: equal called on too many args"
     else (
-      match arg_values with 
-      | [arg1; arg2] -> EBool (eval arg2 env functions = eval arg1 env functions, ())
+      match arg_values with
+      | [ arg1; arg2 ] -> EBool (eval arg2 env functions = eval arg1 env functions, ())
       | _ -> failwith "ice: equal called on too many args")
-  | EApp (EId("print", _), arg_values, _, _) ->
+  | EApp (EId ("print", _), arg_values, _, _) ->
     if List.length arg_values != 1
     then failwith "ice: print called on too many args"
     else (
@@ -109,7 +109,7 @@ let rec eval (expr : 'a expr) (env : (string * unit expr) list) (functions : 'a 
         printf "%s\n" (expr_val_to_string tup);
         tup
       | _ -> failwith "ice1")
-  | EApp (EId(fun_name, _), arg_values_unevaled, _, _) ->
+  | EApp (EId (fun_name, _), arg_values_unevaled, _, _) ->
     let (DFun (_, tagged_arg_names, _, body, _)) = get_fun fun_name functions in
     let arg_names =
       List.map
@@ -162,8 +162,8 @@ and eval_to_tuple (e : 'a expr) (env : (string * 'a expr) list) (functions : 'a 
 
 and eval_prog (p : 'a program) : unit expr =
   match p with
-  (* Since our interpreter isn't concerned with giving correct error messages, we just 
-  flatten the list of decls and ignore the groups *)
+  (* Since our interpreter isn't concerned with giving correct error messages, we just
+     flatten the list of decls and ignore the groups *)
   | Program (tydecls, decls, expr, _) -> eval expr [] (List.flatten decls)
 ;;
 

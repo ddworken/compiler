@@ -1,8 +1,8 @@
 open Exprs
-open Pretty 
+open Pretty
 open Phases
-open Errors 
-open Printf 
+open Errors
+open Printf
 
 let rec find_opt ls x =
   match ls with
@@ -23,7 +23,7 @@ let rename_and_tag (p : tag program) : tag program =
     | Program (tydecls, [], body, tag) -> Program (tydecls, [], helpE env body, tag)
     | Program (_, _, _, _) ->
       raise (InternalCompilerError "Found decls in rename_and_tag when they should have been desugared away")
-  and helpB env (b: tag bind) =
+  and helpB env (b : tag bind) =
     match b with
     | BBlank (typ, tag) -> b, env
     | BName (name, typ, tag) ->
@@ -64,10 +64,10 @@ let rename_and_tag (p : tag program) : tag program =
     | ESetItem (e, idx, len, newval, tag) -> ESetItem (helpE env e, idx, len, helpE env newval, tag)
     | EPrim1 (op, typs, arg, tag) -> EPrim1 (op, typs, helpE env arg, tag)
     | EPrim2 (op, typs, left, right, tag) -> EPrim2 (op, typs, helpE env left, helpE env right, tag)
-    | ETryCatch(e1, n, e2, tag) -> ETryCatch(helpE env e1, n, helpE env e2, tag)
-    | EThrow(n, tag) -> EThrow(n, tag)
+    | ETryCatch (e1, n, e2, tag) -> ETryCatch (helpE env e1, n, helpE env e2, tag)
+    | EThrow (n, tag) -> EThrow (n, tag)
     | EIf (c, t, f, tag) -> EIf (helpE env c, helpE env t, helpE env f, tag)
-    | EString _ | ENumber _ | EBool _ | ENil _ -> e 
+    | EString _ | ENumber _ | EBool _ | ENil _ -> e
     | EId (name, tag) ->
       (try EId (find env name, tag) with
       | InternalCompilerError _ -> e)

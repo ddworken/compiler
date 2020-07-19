@@ -1,9 +1,9 @@
 open Printf
 open Int64
 open Errors
-open Exprs 
-open String 
-open Pretty 
+open Exprs
+open String
+open Pretty
 open TypeCheck
 
 (* Abstract syntax of (a small subset of) x86 assembly instructions *)
@@ -85,17 +85,17 @@ type instruction =
   | ITest of arg * arg
   | ILineComment of string
   | IInstrComment of instruction * string
-  | ILocationData of instruction * sourcespan list 
+  | ILocationData of instruction * sourcespan list
   | IEnter of int * int
   | ILeave
   | CMovne of arg * arg
   | CMove of arg * arg
   | CMovle of arg * arg
   | CMovl of arg * arg
-  | StringConstant of string * string 
-  | ArrayConstant of string * string list 
-  | ICqo 
-  | IIDiv of arg 
+  | StringConstant of string * string
+  | ArrayConstant of string * string list
+  | ICqo
+  | IIDiv of arg
 
 let r_to_asm (r : reg) : string =
   match r with
@@ -126,10 +126,7 @@ let rec arg_to_asm (a : arg) : string =
     if n >= 0
     then sprintf "[%s+%d]" (r_to_asm r) (n * word_size)
     else sprintf "[%s-%d]" (r_to_asm r) (-1 * word_size * n)
-  | RegByteOffset (n, r) ->
-    if n >= 0
-    then sprintf "[%s+%d]" (r_to_asm r) (n)
-    else sprintf "[%s-%d]" (r_to_asm r) (-1 * n)
+  | RegByteOffset (n, r) -> if n >= 0 then sprintf "[%s+%d]" (r_to_asm r) n else sprintf "[%s-%d]" (r_to_asm r) (-1 * n)
   | RegOffsetReg (r1, r2, mul, off) -> sprintf "[%s + %s * %d + %d]" (r_to_asm r1) (r_to_asm r2) mul off
   | Sized (size, a) ->
     sprintf
@@ -176,22 +173,25 @@ let rec i_to_asm (i : instruction) : string =
   | ITest (arg, comp) -> sprintf "  test %s, %s" (arg_to_asm arg) (arg_to_asm comp)
   | ILineComment str -> sprintf "  ;; %s" str
   | IInstrComment (instr, str) -> sprintf "%s ; %s" (i_to_asm instr) str
-  | ILocationData (instr, locs) -> 
-    let filtered_locs = List.filter (fun (l) -> l <> dummy_span) locs in 
-    if List.length filtered_locs > 0 then 
-  sprintf "%s ; \t\t\t\t\t#Source_Map:[%s]" (i_to_asm instr) (ExtString.String.join ", " (List.map string_of_sourcespan_without_fn filtered_locs)) 
-  else 
-  (i_to_asm instr)
+  | ILocationData (instr, locs) ->
+    let filtered_locs = List.filter (fun l -> l <> dummy_span) locs in
+    if List.length filtered_locs > 0
+    then
+      sprintf
+        "%s ; \t\t\t\t\t#Source_Map:[%s]"
+        (i_to_asm instr)
+        (ExtString.String.join ", " (List.map string_of_sourcespan_without_fn filtered_locs))
+    else i_to_asm instr
   | IEnter (slots, depth) -> sprintf "  enter %d, %d" slots depth
   | ILeave -> "  leave"
   | CMovne (a, b) -> sprintf "  cmovne %s, %s" (arg_to_asm a) (arg_to_asm b)
   | CMove (a, b) -> sprintf "  cmove %s, %s" (arg_to_asm a) (arg_to_asm b)
   | CMovle (a, b) -> sprintf "  cmovle %s, %s" (arg_to_asm a) (arg_to_asm b)
   | CMovl (a, b) -> sprintf "  cmovl %s, %s" (arg_to_asm a) (arg_to_asm b)
-  | StringConstant(a,b) -> sprintf "%s: db \"%s\", 0" a b 
-  | ArrayConstant(n, l) -> sprintf "%s: dq %s" n (String.concat ", " l)
+  | StringConstant (a, b) -> sprintf "%s: db \"%s\", 0" a b
+  | ArrayConstant (n, l) -> sprintf "%s: dq %s" n (String.concat ", " l)
   | ICqo -> "  cqo"
-  | IIDiv(a) -> sprintf "  idiv %s" (arg_to_asm a)
+  | IIDiv a -> sprintf "  idiv %s" (arg_to_asm a)
 ;;
 
 let to_asm (is : instruction list) : string = List.fold_left (fun s i -> sprintf "%s\n%s" s (i_to_asm i)) "" is
@@ -237,7 +237,7 @@ let rec remove_illegal_immediates (instructions : instruction list) : instructio
      | ITest (a, ((Const n | HexConst n | Sized (QWORD_PTR, (Const n | HexConst n))) as b)) ) as op)
     :: rest
     when n > Int64.of_int32 Int32.max_int || n < Int64.of_int32 Int32.min_int -> inner op a b rest
-  | (CMovne (Reg _, Reg _) | CMove (Reg _, Reg _) | CMovl (Reg _, Reg _) | CMovle (Reg _, Reg _)) as op :: rest ->
+  | ((CMovne (Reg _, Reg _) | CMove (Reg _, Reg _) | CMovl (Reg _, Reg _) | CMovle (Reg _, Reg _)) as op) :: rest ->
     op :: remove_illegal_immediates rest
   | ((CMovne (a, b) | CMove (a, b) | CMovl (a, b) | CMovle (a, b)) as op) :: rest -> inner op a b rest
   | IInstrComment (i, s) :: rest ->
@@ -251,7 +251,7 @@ let rec remove_illegal_immediates (instructions : instruction list) : instructio
   | ILocationData (i, s) :: rest ->
     (match remove_illegal_immediates [ i ] with
     | [ i ] -> ILocationData (i, s) :: remove_illegal_immediates rest
-    | [ a; b ] -> ILocationData(a, s) :: ILocationData (b, s) :: remove_illegal_immediates rest
+    | [ a; b ] -> ILocationData (a, s) :: ILocationData (b, s) :: remove_illegal_immediates rest
     | err ->
       raise
         (InternalCompilerError

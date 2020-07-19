@@ -1,10 +1,10 @@
-open Phases 
-open Printf 
-open Errors 
-open Exprs 
-
+open Phases
+open Printf
+open Errors
+open Exprs
 module StringSet = Set.Make (String)
 module StringMap = Map.Make (String)
+
 type 'a sm_envt = 'a StringMap.t
 
 (* Scope_info stores the location where something was defined,
@@ -31,7 +31,7 @@ let is_well_formed (p : sourcespan program) : sourcespan program fallible =
   let rec wf_E e (env : scope_info sm_envt) (tyenv : StringSet.t) =
     debug_printf "In wf_E: %s\n" (ExtString.String.join ", " (env_keys env));
     match e with
-    | EString _ -> [] 
+    | EString _ -> []
     | ESeq (e1, e2, _) -> wf_E e1 env tyenv @ wf_E e2 env tyenv
     | ETuple (es, _) -> List.concat (List.map (fun e -> wf_E e env tyenv) es)
     | EGetItem (e, idx, len, pos) ->
@@ -48,10 +48,11 @@ let is_well_formed (p : sourcespan program) : sourcespan program fallible =
     | EId (x, loc) -> if StringMap.mem x env then [] else [ UnboundId (x, loc) ]
     | EPrim1 (_, _, e, _) -> wf_E e env tyenv
     | EPrim2 (_, _, l, r, _) -> wf_E l env tyenv @ wf_E r env tyenv
-    | EThrow(n, l) -> if List.mem n !global_defined_exns then [] else [UndefinedException(n, l)] 
-    | ETryCatch(e1, n, e2, l) -> let rec_es = wf_E e1 env tyenv @ wf_E e2 env tyenv in 
-    let exn_es = if List.mem n !global_defined_exns then [] else [UndefinedException(n, l)] in 
-    rec_es @ exn_es
+    | EThrow (n, l) -> if List.mem n !global_defined_exns then [] else [ UndefinedException (n, l) ]
+    | ETryCatch (e1, n, e2, l) ->
+      let rec_es = wf_E e1 env tyenv @ wf_E e2 env tyenv in
+      let exn_es = if List.mem n !global_defined_exns then [] else [ UndefinedException (n, l) ] in
+      rec_es @ exn_es
     | EIf (c, t, f, _) -> wf_E c env tyenv @ wf_E t env tyenv @ wf_E f env tyenv
     | ELet (bindings, body, _) ->
       let rec find_locs x (binds : 'a bind list) : 'a list =
@@ -191,7 +192,7 @@ let is_well_formed (p : sourcespan program) : sourcespan program fallible =
         | BTuple (args, _) -> List.concat (List.map flatten_bind args)
       in
       process_args binds @ wf_E body (merge_envs (List.concat (List.map flatten_bind binds)) env) tyenv
-      | ETryCatchFinally _ -> raise (NotYetImplemented "ETryCatchFinally")
+    | ETryCatchFinally _ -> raise (NotYetImplemented "ETryCatchFinally")
   and wf_D d (env : scope_info sm_envt) (tyenv : StringSet.t) =
     match d with
     | DFun (_, args, typ, body, _) ->
@@ -253,12 +254,19 @@ let is_well_formed (p : sourcespan program) : sourcespan program fallible =
       in
       let errs = List.flatten (List.map (wf_T tyenv) args) in
       errs, tyenv
-    | ExceptionDecl(name, _) -> [], tyenv
-
+    | ExceptionDecl (name, _) -> [], tyenv
   in
   match p with
   | Program (tydecls, decls, body, _) ->
-    global_defined_exns := List.flatten (List.map (fun (d) -> match d with | TyDecl _ -> [] | ExceptionDecl(n, _) -> [n]) tydecls) @ ["exn"]; 
+    global_defined_exns
+      := List.flatten
+           (List.map
+              (fun d ->
+                match d with
+                | TyDecl _ -> []
+                | ExceptionDecl (n, _) -> [ n ])
+              tydecls)
+         @ [ "exn" ];
     let initial_env = StringMap.mapi (fun name typ -> get_tag_T typ, None, None) StringMap.empty in
     let initial_env =
       StringMap.fold
@@ -318,9 +326,9 @@ let freevars (e : 'a cexpr) : string list =
     | CGetItem (lhs, _, _) -> freevars_i lhs known_variables
     | CSetItem (lhs, _, rhs, _) -> freevars_i lhs known_variables @ freevars_i rhs known_variables
     | CLambda (args, body, _) -> freevars_a body (known_variables @ args)
-    | CString _ -> [] 
-    | CTryCatch(e1, n, e2, _) -> freevars_a e1 known_variables @ freevars_a e2 known_variables
-    | CThrow _ -> [] 
+    | CString _ -> []
+    | CTryCatch (e1, n, e2, _) -> freevars_a e1 known_variables @ freevars_a e2 known_variables
+    | CThrow _ -> []
   and freevars_a (e : 'a aexpr) (known_variables : string list) : string list =
     match e with
     | ALet (n, v, body, _) -> freevars_c v known_variables @ freevars_a body (n :: known_variables)

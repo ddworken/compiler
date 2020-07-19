@@ -25,7 +25,6 @@ let ta name program expected = name >:: test_run_anf program name expected
 let te name program expected_err = name >:: test_err ~vg:run_in_valgrind program name expected_err
 let tanf name program expected = name >:: fun _ -> assert_equal expected (anf (tag program)) ~printer:string_of_aprogram
 let teq name actual expected = name >:: fun _ -> assert_equal expected actual ~printer:(fun s -> s)
-
 let t_input name program input expected = name >:: my_test_run ~args:[] ~std_input:input program name expected
 
 let te_input name program input expected =
@@ -554,18 +553,9 @@ let num_comparison_tests =
   ; t "let_lt_1" "let x = 1, y = 2 in x < y" "true"
   ; t "let_lt_2" "let x=1, y=1 in x < y" "false"
   ; t "let_lt_3" "let x=1, y=0 in x < y" "false"
-  ; te
-      "let_lt_4"
-      "let x=1, y=false in x < y"
-      "Type Error: comparison expected a number, found 0x7fffffffffffffff"
-  ; te
-      "let_lt_5"
-      "let x=false, y=2 in x < y"
-      "Type Error: comparison expected a number, found 0x7fffffffffffffff"
-  ; te
-      "let_lt_6"
-      "let x=false, y=true in x < y"
-      "Type Error: comparison expected a number, found 0x7fffffffffffffff"
+  ; te "let_lt_4" "let x=1, y=false in x < y" "Type Error: comparison expected a number, found 0x7fffffffffffffff"
+  ; te "let_lt_5" "let x=false, y=2 in x < y" "Type Error: comparison expected a number, found 0x7fffffffffffffff"
+  ; te "let_lt_6" "let x=false, y=true in x < y" "Type Error: comparison expected a number, found 0x7fffffffffffffff"
   ; t "lte_1" "1<=2" "true"
   ; t "lte_2" "1<=1" "true"
   ; t "lte_3" "1<=0" "false"
@@ -1444,59 +1434,115 @@ let gc_tests =
   ]
 ;;
 
-let string_tests = [
-    t "simple_string_1" "\"a\"" "\"a\"" ;
-    t "simple_string_2" "\"a b\"" "\"a b\"" ;
-    t "simple_string_3" "\"hello world!\"" "\"hello world!\"" ;
-    t "medium_string_1" "let x=\"hello world!\" in print(x); 5" "\"hello world!\"\n5" ;
-    tgc "gc_string_1" ( add_space_for_native_functions 6) "def f():(\"a\"; 5)\nf();f();f()" "" "5" ; 
-    tgce "gc_string_1" ( add_space_for_native_functions 5) "def f():(\"a\"; 5)\nf();f();f()" "" "Out of memory: needed 2 words, but only 1 remain after collection" ; 
-    t "string_len_1" "string_len(\"a\")" "1" ; 
-    t "string_len_2" "string_len(\"hello world\")" "11"; 
-    te "string_len_3" "string_len(5)" "Error: Expected a string, found: 5";
-    t "string_char_at_1" "char_at(\"a\", 0)" "\"a\"";
-    te "string_char_at_2" "char_at(\"a\", 1)" "Error: char_at(a, 1): Index Out Of Bounds";
-    te "string_char_at_3" "char_at(\"a\", -1)" "Error: char_at(a, -1): Index Out Of Bounds";
-    t "string_char_at_4" "char_at(\"abc\", 0)" "\"a\"";
-    t "string_char_at_5" "char_at(\"abc\", 1)" "\"b\"";
-    t "string_char_at_6" "char_at(\"abc\", 2)" "\"c\"";
-    te "string_char_at_7" "char_at(\"abc\", 3)" "Error: char_at(abc, 3): Index Out Of Bounds";
-    te "string_char_at_8" "char_at(\"abc\", -1)" "Error: char_at(abc, -1): Index Out Of Bounds";
-    te "string_char_at_9" "char_at(true, 0)" "Error: Expected a string, found: true";
-    te "string_char_at_10" "char_at(\"true\", \"1\")" "Type Error: Expected a number, found: \"1\"";
-    tgc "gc_string_in_tuple_0a" (add_space_for_native_functions 6) "(\"abc\", 1)" "" "(\"abc\", 1)";
-    tgce "gc_string_in_tuple_0b" (add_space_for_native_functions 5) "(\"abc\", 1)" "" "Out of memory: needed 4 words, but only 3 remain after collection";
-    tgc "gc_string_in_tuple_1" ( add_space_for_native_functions 6)"(\"abc\",1); (1,2)" "" "(1, 2)";
-    tgce "gc_string_in_tuple_2" ( add_space_for_native_functions 5)"(\"abc\",1); (1,2)" "" "Error 10: Out of memory: needed 4 words, but only 3 remain after collection";
-    tgc "gc_string_in_tuple_3" ( add_space_for_native_functions 10)"let x=(\"abc\",1) in ((1,2);(1,3);(1,4);x)" "" "(\"abc\", 1)";
-    tgce "gc_string_in_tuple_4" ( add_space_for_native_functions 9)"let x=(\"abc\",1) in ((1,2);(1,3);(1,4);x)" "" "Error 10: Out of memory: needed 4 words, but only 3 remain after collection";
-    t "string_append_1" "string_append(\"abc\", \"def\")" "\"abcdef\"";
-    t "string_append_2" "string_append(\"\", \"\")" "\"\"";
-    t "string_append_3" "string_append(\"\", \"a\")" "\"a\"";
-    t "string_append_4" "string_append(\"b\", \"\")" "\"b\"";
-    t "string_append_5" "string_append(\"aaa\", \"bbbbbbbbb\")" "\"aaabbbbbbbbb\"";
-    te "string_append_6" "string_append(\"aaa\", 1)" "Type Error: Expected a string, found: 1";
-    te "string_append_7" "string_append(true, \"bbbbbbbbb\")" "Type Error: Expected a string, found: true"
-]
+let string_tests =
+  [ t "simple_string_1" "\"a\"" "\"a\""
+  ; t "simple_string_2" "\"a b\"" "\"a b\""
+  ; t "simple_string_3" "\"hello world!\"" "\"hello world!\""
+  ; t "medium_string_1" "let x=\"hello world!\" in print(x); 5" "\"hello world!\"\n5"
+  ; tgc "gc_string_1" (add_space_for_native_functions 6) "def f():(\"a\"; 5)\nf();f();f()" "" "5"
+  ; tgce
+      "gc_string_1"
+      (add_space_for_native_functions 5)
+      "def f():(\"a\"; 5)\nf();f();f()"
+      ""
+      "Out of memory: needed 2 words, but only 1 remain after collection"
+  ; t "string_len_1" "string_len(\"a\")" "1"
+  ; t "string_len_2" "string_len(\"hello world\")" "11"
+  ; te "string_len_3" "string_len(5)" "Error: Expected a string, found: 5"
+  ; t "string_char_at_1" "char_at(\"a\", 0)" "\"a\""
+  ; te "string_char_at_2" "char_at(\"a\", 1)" "Error: char_at(a, 1): Index Out Of Bounds"
+  ; te "string_char_at_3" "char_at(\"a\", -1)" "Error: char_at(a, -1): Index Out Of Bounds"
+  ; t "string_char_at_4" "char_at(\"abc\", 0)" "\"a\""
+  ; t "string_char_at_5" "char_at(\"abc\", 1)" "\"b\""
+  ; t "string_char_at_6" "char_at(\"abc\", 2)" "\"c\""
+  ; te "string_char_at_7" "char_at(\"abc\", 3)" "Error: char_at(abc, 3): Index Out Of Bounds"
+  ; te "string_char_at_8" "char_at(\"abc\", -1)" "Error: char_at(abc, -1): Index Out Of Bounds"
+  ; te "string_char_at_9" "char_at(true, 0)" "Error: Expected a string, found: true"
+  ; te "string_char_at_10" "char_at(\"true\", \"1\")" "Type Error: Expected a number, found: \"1\""
+  ; tgc "gc_string_in_tuple_0a" (add_space_for_native_functions 6) "(\"abc\", 1)" "" "(\"abc\", 1)"
+  ; tgce
+      "gc_string_in_tuple_0b"
+      (add_space_for_native_functions 5)
+      "(\"abc\", 1)"
+      ""
+      "Out of memory: needed 4 words, but only 3 remain after collection"
+  ; tgc "gc_string_in_tuple_1" (add_space_for_native_functions 6) "(\"abc\",1); (1,2)" "" "(1, 2)"
+  ; tgce
+      "gc_string_in_tuple_2"
+      (add_space_for_native_functions 5)
+      "(\"abc\",1); (1,2)"
+      ""
+      "Error 10: Out of memory: needed 4 words, but only 3 remain after collection"
+  ; tgc
+      "gc_string_in_tuple_3"
+      (add_space_for_native_functions 10)
+      "let x=(\"abc\",1) in ((1,2);(1,3);(1,4);x)"
+      ""
+      "(\"abc\", 1)"
+  ; tgce
+      "gc_string_in_tuple_4"
+      (add_space_for_native_functions 9)
+      "let x=(\"abc\",1) in ((1,2);(1,3);(1,4);x)"
+      ""
+      "Error 10: Out of memory: needed 4 words, but only 3 remain after collection"
+  ; t "string_append_1" "string_append(\"abc\", \"def\")" "\"abcdef\""
+  ; t "string_append_2" "string_append(\"\", \"\")" "\"\""
+  ; t "string_append_3" "string_append(\"\", \"a\")" "\"a\""
+  ; t "string_append_4" "string_append(\"b\", \"\")" "\"b\""
+  ; t "string_append_5" "string_append(\"aaa\", \"bbbbbbbbb\")" "\"aaabbbbbbbbb\""
+  ; te "string_append_6" "string_append(\"aaa\", 1)" "Type Error: Expected a string, found: 1"
+  ; te "string_append_7" "string_append(true, \"bbbbbbbbb\")" "Type Error: Expected a string, found: true"
+  ]
+;;
 
-let exn_tests = [
-    t "exn_simple_none_thrown" "exception foo\ntry {print(1)} catch (foo) {print(2)}" "1\n1"
-    ; t "exn_simple_thrown" "exception foo\ntry {print(1); (throw foo); print(2)} catch (foo) {print(3)}" "1\n3\n3"
-    ; te "exn_simple_uncaught" "exception foo\nthrow foo" "Unhandled exception: foo" 
-    ; te "exn_only_catch_matching" "exception foo\nexception bar\ntry { print(1); (throw foo); print(2) } catch (bar) { print(3) }" "Unhandled exception: foo"
-    ; t "exn_binding_in_try" "exception foo\nlet x=1 in try {x} catch (foo) {2}" "1"
-    ; t "exn_binding_in_catch" "exception foo\nlet x=1 in try {throw foo} catch (foo) {x}" "1"
-    ; t "exn_throw_in_catch" "exception foo\nexception bar\ntry { try { print(1); (throw foo); print(2) } catch (foo) { print(3); throw bar } } catch (bar) { print(4) }" "1\n3\n4\n4"
-    ; t "exn_single_closest_handler_1" "exception foo\nexception bar\ntry { try { print(1); (throw foo); print(2) } catch (foo) { print(3) } } catch (foo) { print(4) }" "1\n3\n3"
-    ; t "exn_single_closest_handler_2" "exception foo\nexception bar\ntry { try { print(1); (throw foo); print(2) } catch (bar) { print(3) } } catch (foo) { print(4) }" "1\n4\n4"
-    ; t "exn_handler_nested" "exception foo\n(try {throw foo} catch (foo) {2}) + 3" "5"
-    ; te "exn_uncaught_not_matching" "exception foo\nexception bar\ntry { throw foo } catch (bar) {1}" "Error 16: Unhandled exception: foo"
-    ; te "exn_handler_go_out_of_scope" "exception foo\n(try {1} catch (foo) {2}); (throw foo)" "Error 16: Unhandled exception: foo"
-    ; te "exn_uncaught_in_print" "exception foo\nprint(throw foo)" "Error 16: Unhandled exception: foo"
-    ; t "deeply_nested_handlers" "exception foo\ndef func(n): if n == 0: throw foo else: try { func(n - 1) } catch (foo) { print(n); throw foo }  try { func(10) } catch (foo) { print(123) }" "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n123\n123"
-    ; te "throw_undefined_exn" "throw foo" "Undefined exception foo used at throw_undefined_exn, 1:0-1:9"
-    ; te "catch_undefined_exn" "try {1} catch (foo) {2}" "Undefined exception foo used at catch_undefined_exn, 1:0-1:23"
-]
+let exn_tests =
+  [ t "exn_simple_none_thrown" "exception foo\ntry {print(1)} catch (foo) {print(2)}" "1\n1"
+  ; t "exn_simple_thrown" "exception foo\ntry {print(1); (throw foo); print(2)} catch (foo) {print(3)}" "1\n3\n3"
+  ; te "exn_simple_uncaught" "exception foo\nthrow foo" "Unhandled exception: foo"
+  ; te
+      "exn_only_catch_matching"
+      "exception foo\nexception bar\ntry { print(1); (throw foo); print(2) } catch (bar) { print(3) }"
+      "Unhandled exception: foo"
+  ; t "exn_binding_in_try" "exception foo\nlet x=1 in try {x} catch (foo) {2}" "1"
+  ; t "exn_binding_in_catch" "exception foo\nlet x=1 in try {throw foo} catch (foo) {x}" "1"
+  ; t
+      "exn_throw_in_catch"
+      "exception foo\n\
+       exception bar\n\
+       try { try { print(1); (throw foo); print(2) } catch (foo) { print(3); throw bar } } catch (bar) { print(4) }"
+      "1\n3\n4\n4"
+  ; t
+      "exn_single_closest_handler_1"
+      "exception foo\n\
+       exception bar\n\
+       try { try { print(1); (throw foo); print(2) } catch (foo) { print(3) } } catch (foo) { print(4) }"
+      "1\n3\n3"
+  ; t
+      "exn_single_closest_handler_2"
+      "exception foo\n\
+       exception bar\n\
+       try { try { print(1); (throw foo); print(2) } catch (bar) { print(3) } } catch (foo) { print(4) }"
+      "1\n4\n4"
+  ; t "exn_handler_nested" "exception foo\n(try {throw foo} catch (foo) {2}) + 3" "5"
+  ; te
+      "exn_uncaught_not_matching"
+      "exception foo\nexception bar\ntry { throw foo } catch (bar) {1}"
+      "Error 16: Unhandled exception: foo"
+  ; te
+      "exn_handler_go_out_of_scope"
+      "exception foo\n(try {1} catch (foo) {2}); (throw foo)"
+      "Error 16: Unhandled exception: foo"
+  ; te "exn_uncaught_in_print" "exception foo\nprint(throw foo)" "Error 16: Unhandled exception: foo"
+  ; t
+      "deeply_nested_handlers"
+      "exception foo\n\
+       def func(n): if n == 0: throw foo else: try { func(n - 1) } catch (foo) { print(n); throw foo }  try { func(10) \
+       } catch (foo) { print(123) }"
+      "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n123\n123"
+  ; te "throw_undefined_exn" "throw foo" "Undefined exception foo used at throw_undefined_exn, 1:0-1:9"
+  ; te "catch_undefined_exn" "try {1} catch (foo) {2}" "Undefined exception foo used at catch_undefined_exn, 1:0-1:23"
+  ]
+;;
 
 (*
   _    _       _ _     _______        _       
@@ -1826,8 +1872,8 @@ let compile_tests =
   @ interpreter_tests
   @ higher_ordered_functions_tests
   @ gc_tests
-  @ string_tests 
-  @ exn_tests 
+  @ string_tests
+  @ exn_tests
 ;;
 
 let suite = "suite" >::: compile_tests

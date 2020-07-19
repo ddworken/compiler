@@ -6,10 +6,10 @@ open Assembly
 open Errors
 open ExtLib
 open TypeCheck
-open Desugar 
-open Rename 
-open Anf 
-open WellFormed 
+open Desugar
+open Rename
+open Anf
+open WellFormed
 
 type 'a envt = (string * 'a) list
 
@@ -148,12 +148,14 @@ let rec get_arg_errors (args : (string * sourcespan) list) : exn list =
   | [] -> []
 ;;
 
-let tag_instructions_with_location (instrs: instruction list) (loc: sourcespan) : instruction list = 
-  let tag_instruction_with_location (instr: instruction) = (
-    match instr with 
-     | ILocationData(instr, locs) -> ILocationData(instr, loc::locs)
-     | instr -> ILocationData(instr, [loc])
-  ) in List.map tag_instruction_with_location instrs 
+let tag_instructions_with_location (instrs : instruction list) (loc : sourcespan) : instruction list =
+  let tag_instruction_with_location (instr : instruction) =
+    match instr with
+    | ILocationData (instr, locs) -> ILocationData (instr, loc :: locs)
+    | instr -> ILocationData (instr, [ loc ])
+  in
+  List.map tag_instruction_with_location instrs
+;;
 
 (* Compile the given aexpr to a list of instructions *)
 let rec compile_aexpr
@@ -180,10 +182,13 @@ let rec compile_aexpr
     let prelude = compile_cexpr var_val (si + 1) env num_args was_typechecked in
     let stack_reg = RegOffset (~-si, RBP) in
     let body = compile_aexpr body (si + 1) ((var_name, stack_reg) :: env) num_args was_typechecked in
-    let code = prelude
-    @ [ IInstrComment (IMov (stack_reg, Reg RAX), sprintf "%s holds the variable %s" (arg_to_asm stack_reg) var_name) ]
-    @ body in 
-    tag_instructions_with_location code (get_sourcespan t) 
+    let code =
+      prelude
+      @ [ IInstrComment (IMov (stack_reg, Reg RAX), sprintf "%s holds the variable %s" (arg_to_asm stack_reg) var_name)
+        ]
+      @ body
+    in
+    tag_instructions_with_location code (get_sourcespan t)
   | ACExpr cexpr -> compile_cexpr cexpr si env num_args was_typechecked
   | ASeq (e1, e2, _) ->
     compile_cexpr e1 si env num_args was_typechecked @ compile_aexpr e2 si env num_args was_typechecked
@@ -209,7 +214,7 @@ and generate_stack_setup (e : 'a aexpr) (additional_space : int) (check_stack_sp
   @ [ IEnter (stack_size, 0) ]
   (* We increment the depth of all the exception handlers so that we can properly unwind the stack when handling
    * nested exceptions *)
-   @  compile_native_call "increment_exn_depths" []
+  @ compile_native_call "increment_exn_depths" []
   (* And for debugging purposes we want all the stack registers to be zeroed out, so mov 0 into all of them *)
   @
   if stack_size > 0
@@ -285,8 +290,8 @@ and compile_lam_helper
       (other_locations : arg list)
     (* A list of reserved argument names that the lambda will close over and space should be allocated for on the heap *)
       (reserved_args : string list)
-    (* Whether or not this CLambda should close over itself. If so, allow this function to call itself by including the 
-    * provided string in the env when compiling the body of the lambda *)
+    (* Whether or not this CLambda should close over itself. If so, allow this function to call itself by including the
+       * provided string in the env when compiling the body of the lambda *)
       (close_over_self : string option)
     : instruction list * int * (string * arg) list
   =
@@ -331,14 +336,13 @@ and compile_lam_helper
     let code =
       [ ILineComment (sprintf "Define lambda-%d {" (get_int tag)); IJmp (Label end_label); ILabel lambda_label ]
       @ generate_stack_setup body (List.length (free_vars @ reserved_args)) true
-      @ [ ILineComment
-            "Copy the free variables off the heap onto the stack "
-          ; ILineComment "where they can be used by the body of the lambda {"
+      @ [ ILineComment "Copy the free variables off the heap onto the stack "
+        ; ILineComment "where they can be used by the body of the lambda {"
         ; ILineComment "Start by moving the last argument of the function which is the"
         ; ILineComment "function itself into RAX so we can unpack the closed over values:"
-        ;              IMov (Reg RAX, self_location)
+        ; IMov (Reg RAX, self_location)
         ; ILineComment "And detag it. Our invariant is that it is lambda so no need to tag check:"
-            ; ISub (Reg RAX, HexConst closure_tag)
+        ; ISub (Reg RAX, HexConst closure_tag)
         ]
       @ List.flatten
           (List.mapi
@@ -354,9 +358,9 @@ and compile_lam_helper
       @ compile_aexpr body (List.length (free_vars @ reserved_args) + 1) new_arg_env (List.length args) was_typechecked
       (* After we finish executing the body, we need to decrement our counter of the number of stack frames in order
        * to properly support unwinding the stack for exceptions *)
-      @ [IMov(Reg reserved_temp_register_1, Reg RAX)]
+      @ [ IMov (Reg reserved_temp_register_1, Reg RAX) ]
       @ compile_native_call "decrement_exn_depths" []
-      @ [ IMov(Reg RAX, Reg reserved_temp_register_1)
+      @ [ IMov (Reg RAX, Reg reserved_temp_register_1)
         ; ILeave
         ; IRet
         ; ILineComment (sprintf "} define lambda-%d" (get_int tag))
@@ -408,179 +412,202 @@ and compile_lam_helper
         ; ILineComment (sprintf "} store lambda-%d" (get_int tag))
         ]
     in
-    let code = tag_instructions_with_location code (get_sourcespan tag) in 
+    let code = tag_instructions_with_location code (get_sourcespan tag) in
     code, used_heap_slots, List.combine reserved_args reserved_arg_heap_locations
-  | CIf _ | CPrim1 _ | CPrim2 _ | CTuple _ | CImmExpr _ | CApp _ | CGetItem _ | CSetItem _ | CString _ | CTryCatch _ | CThrow _->
-    raise (InternalCompilerError "compile_lam_helper called on a non-CLambda")
+  | CIf _
+  | CPrim1 _
+  | CPrim2 _
+  | CTuple _
+  | CImmExpr _
+  | CApp _
+  | CGetItem _
+  | CSetItem _
+  | CString _
+  | CTryCatch _
+  | CThrow _ -> raise (InternalCompilerError "compile_lam_helper called on a non-CLambda")
 
 (* Compile the given cexpr to a list of instructions *)
 and compile_cexpr (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (was_typechecked : bool)
     : instruction list
   =
   match e with
-  | CString(s, tag) -> 
-  let string_size_on_heap = Int64.of_int (round_up_to_multiple_of_16 (String.length s + 1)) in 
-  let explode s = List.init (String.length s) (String.get s) in 
-  let code = 
-  [ ILineComment (sprintf "Allocate space for the string '%s' on the heap:" s)]
-  @ reserve string_size_on_heap tag 
-  @ [ILineComment (sprintf "And put it on the heap:")]
-  @ List.flatten (List.mapi (fun i (char) -> [
-    IMov(Sized(BYTE_PTR, RegByteOffset(i, reserved_heap_reg)), Const(Int64.of_int (Char.code char)))
-  ]) (explode s))
-  @ [ IMov(Sized(BYTE_PTR, RegByteOffset(String.length s, reserved_heap_reg)), Const(0L))
-    ; ILineComment "Then tag it and move it to RAX"; IMov (Reg RAX, Reg reserved_heap_reg)
-      ; IAdd (Reg RAX, HexConst string_tag)
-      ; IAdd (Reg reserved_heap_reg, Const string_size_on_heap)
-      ]
-      in tag_instructions_with_location code (get_sourcespan tag)
+  | CString (s, tag) ->
+    let string_size_on_heap = Int64.of_int (round_up_to_multiple_of_16 (String.length s + 1)) in
+    let explode s = List.init (String.length s) (String.get s) in
+    let code =
+      [ ILineComment (sprintf "Allocate space for the string '%s' on the heap:" s) ]
+      @ reserve string_size_on_heap tag
+      @ [ ILineComment (sprintf "And put it on the heap:") ]
+      @ List.flatten
+          (List.mapi
+             (fun i char ->
+               [ IMov (Sized (BYTE_PTR, RegByteOffset (i, reserved_heap_reg)), Const (Int64.of_int (Char.code char))) ])
+             (explode s))
+      @ [ IMov (Sized (BYTE_PTR, RegByteOffset (String.length s, reserved_heap_reg)), Const 0L)
+        ; ILineComment "Then tag it and move it to RAX"
+        ; IMov (Reg RAX, Reg reserved_heap_reg)
+        ; IAdd (Reg RAX, HexConst string_tag)
+        ; IAdd (Reg reserved_heap_reg, Const string_size_on_heap)
+        ]
+    in
+    tag_instructions_with_location code (get_sourcespan tag)
   | CIf (cond, thn, els, tag) ->
     let else_label = sprintf "if_false_%d" (get_int tag) in
     let done_label = sprintf "done_%d" (get_int tag) in
-    let code = 
-    [ IMov (Reg RAX, compile_imm cond env) ]
-    @ compile_assert_is_bool (Reg RAX) assertion_failed_if_not_bool was_typechecked
-    @ [ ICmp (Reg RAX, const_true); IJne (Label else_label) ]
-    @ compile_aexpr thn si env num_args was_typechecked
-    @ [ IJmp (Label done_label); ILabel else_label ]
-    @ compile_aexpr els si env num_args was_typechecked
-    @ [ ILabel done_label ] in 
+    let code =
+      [ IMov (Reg RAX, compile_imm cond env) ]
+      @ compile_assert_is_bool (Reg RAX) assertion_failed_if_not_bool was_typechecked
+      @ [ ICmp (Reg RAX, const_true); IJne (Label else_label) ]
+      @ compile_aexpr thn si env num_args was_typechecked
+      @ [ IJmp (Label done_label); ILabel else_label ]
+      @ compile_aexpr els si env num_args was_typechecked
+      @ [ ILabel done_label ]
+    in
     tag_instructions_with_location code (get_sourcespan tag)
-  | CPrim1 (_, _, tag) -> tag_instructions_with_location (compile_prim1 e si env num_args was_typechecked) (get_sourcespan tag)
-  | CPrim2 (_, _, _, tag) -> tag_instructions_with_location (compile_prim2 e si env num_args was_typechecked) (get_sourcespan tag)
+  | CPrim1 (_, _, tag) ->
+    tag_instructions_with_location (compile_prim1 e si env num_args was_typechecked) (get_sourcespan tag)
+  | CPrim2 (_, _, _, tag) ->
+    tag_instructions_with_location (compile_prim2 e si env num_args was_typechecked) (get_sourcespan tag)
   | CApp (_, _, _, tag) -> tag_instructions_with_location (compile_fun_app e env was_typechecked) (get_sourcespan tag)
   | CImmExpr e -> [ IMov (Reg RAX, compile_imm e env) ]
   | CTuple (exprs, tag) ->
     let tuple_size_on_heap = Int64.of_int (round_up_to_multiple_of_16 ((List.length exprs + 1) * 8)) in
-    let code = 
-    [ ILineComment (sprintf "Check if we have space on the heap to store our tuple of size %Ld: " tuple_size_on_heap) ]
-    @ reserve tuple_size_on_heap tag
-    @ [ ILineComment "Creating a tuple: "
-      ; IInstrComment
-          ( IMov
-              ( Sized (QWORD_PTR, RegOffset (0, reserved_heap_reg))
-              , int64_to_snake_int (Int64.of_int (List.length exprs)) )
-          , "tuple size" )
+    let code =
+      [ ILineComment (sprintf "Check if we have space on the heap to store our tuple of size %Ld: " tuple_size_on_heap)
       ]
-    @ List.flatten
-        (List.mapi
-           (fun i e ->
-             [ IMov (Sized (QWORD_PTR, Reg RAX), Sized (QWORD_PTR, compile_imm e env))
-             ; IMov (Sized (QWORD_PTR, RegOffset (i + 1, reserved_heap_reg)), Sized (QWORD_PTR, Reg RAX))
-             ])
-           exprs)
-    @ [ IMov (Reg RAX, Reg reserved_heap_reg)
-      ; IAdd (Reg RAX, HexConst tuple_tag)
-      ; IAdd (Reg reserved_heap_reg, Const tuple_size_on_heap)
-      ] in 
-      tag_instructions_with_location code (get_sourcespan tag)
+      @ reserve tuple_size_on_heap tag
+      @ [ ILineComment "Creating a tuple: "
+        ; IInstrComment
+            ( IMov
+                ( Sized (QWORD_PTR, RegOffset (0, reserved_heap_reg))
+                , int64_to_snake_int (Int64.of_int (List.length exprs)) )
+            , "tuple size" )
+        ]
+      @ List.flatten
+          (List.mapi
+             (fun i e ->
+               [ IMov (Sized (QWORD_PTR, Reg RAX), Sized (QWORD_PTR, compile_imm e env))
+               ; IMov (Sized (QWORD_PTR, RegOffset (i + 1, reserved_heap_reg)), Sized (QWORD_PTR, Reg RAX))
+               ])
+             exprs)
+      @ [ IMov (Reg RAX, Reg reserved_heap_reg)
+        ; IAdd (Reg RAX, HexConst tuple_tag)
+        ; IAdd (Reg reserved_heap_reg, Const tuple_size_on_heap)
+        ]
+    in
+    tag_instructions_with_location code (get_sourcespan tag)
   | CGetItem (expr, idx, tag) ->
-  let code = 
-    [ IMov (Reg RAX, compile_imm expr env) ]
-    @ compile_assert_is_tuple (Reg RAX) assertion_failed_not_tuple was_typechecked
-    @
-    if idx < 0
-    then
-      [ ILineComment "At compile time the idx was too small, so hard code the error"
-      ; IMov (Reg RSI, Const (Int64.of_int idx))
-      ; IJmp (Label assertion_failed_get_index_too_small)
-      ]
-    else
-      [ IInstrComment (ISub (Reg RAX, HexConst tuple_tag), "detag")
-      ; ILineComment (sprintf "Check if the tuple is nil")
-      ; ICmp (Reg RAX, HexConst 0L)
-      ; IJe (Label assertion_failed_index_nil)
-      ; ILineComment (sprintf "Check if the idx %d is too large:" idx)
-      ; ICmp (Sized (QWORD_PTR, RegOffset (0, RAX)), int64_to_snake_int (Int64.of_int idx))
-      ; CMovle (Reg RSI, Const (Int64.of_int idx))
-      ; IJle (Label assertion_failed_get_index_too_large)
-      ; ILineComment (sprintf "Get the %d-th item from the tuple: " idx)
-      ; IMov (Reg RAX, RegOffset (idx + 1, RAX))
-      ] in 
-      tag_instructions_with_location code (get_sourcespan tag)
+    let code =
+      [ IMov (Reg RAX, compile_imm expr env) ]
+      @ compile_assert_is_tuple (Reg RAX) assertion_failed_not_tuple was_typechecked
+      @
+      if idx < 0
+      then
+        [ ILineComment "At compile time the idx was too small, so hard code the error"
+        ; IMov (Reg RSI, Const (Int64.of_int idx))
+        ; IJmp (Label assertion_failed_get_index_too_small)
+        ]
+      else
+        [ IInstrComment (ISub (Reg RAX, HexConst tuple_tag), "detag")
+        ; ILineComment (sprintf "Check if the tuple is nil")
+        ; ICmp (Reg RAX, HexConst 0L)
+        ; IJe (Label assertion_failed_index_nil)
+        ; ILineComment (sprintf "Check if the idx %d is too large:" idx)
+        ; ICmp (Sized (QWORD_PTR, RegOffset (0, RAX)), int64_to_snake_int (Int64.of_int idx))
+        ; CMovle (Reg RSI, Const (Int64.of_int idx))
+        ; IJle (Label assertion_failed_get_index_too_large)
+        ; ILineComment (sprintf "Get the %d-th item from the tuple: " idx)
+        ; IMov (Reg RAX, RegOffset (idx + 1, RAX))
+        ]
+    in
+    tag_instructions_with_location code (get_sourcespan tag)
   | CSetItem (tup, idx, new_val, tag) ->
-  let code = 
-    [ IMov (Reg RAX, compile_imm tup env) ]
-    @ compile_assert_is_tuple (Reg RAX) assertion_failed_not_tuple was_typechecked
-    @
-    if idx < 0
-    then
-      [ ILineComment "At compile time the idx was too small, so hard code the error"
-      ; IMov (Reg RSI, Const (Int64.of_int idx))
-      ; IJmp (Label assertion_failed_get_index_too_small)
-      ]
-    else
-      [ IInstrComment (ISub (Reg RAX, HexConst tuple_tag), "detag")
-      ; ILineComment (sprintf "Check if the tuple is nil")
-      ; ICmp (Reg RAX, HexConst 0L)
-      ; IJe (Label assertion_failed_index_nil)
-      ; ILineComment (sprintf "Check if the idx %d is too large:" idx)
-      ; ICmp (Sized (QWORD_PTR, RegOffset (0, RAX)), int64_to_snake_int (Int64.of_int idx))
-      ; CMovle (Reg RSI, Const (Int64.of_int idx))
-      ; IJle (Label assertion_failed_get_index_too_large)
-      ; ILineComment (sprintf "Set the %d-th item from the tuple: " idx)
-      ; IMov (Reg reserved_temp_register_1, compile_imm new_val env)
-      ; IMov (RegOffset (idx + 1, RAX), Reg reserved_temp_register_1)
-      ; IMov (Reg RAX, compile_imm tup env)
-      ] in 
-      tag_instructions_with_location code (get_sourcespan tag)
+    let code =
+      [ IMov (Reg RAX, compile_imm tup env) ]
+      @ compile_assert_is_tuple (Reg RAX) assertion_failed_not_tuple was_typechecked
+      @
+      if idx < 0
+      then
+        [ ILineComment "At compile time the idx was too small, so hard code the error"
+        ; IMov (Reg RSI, Const (Int64.of_int idx))
+        ; IJmp (Label assertion_failed_get_index_too_small)
+        ]
+      else
+        [ IInstrComment (ISub (Reg RAX, HexConst tuple_tag), "detag")
+        ; ILineComment (sprintf "Check if the tuple is nil")
+        ; ICmp (Reg RAX, HexConst 0L)
+        ; IJe (Label assertion_failed_index_nil)
+        ; ILineComment (sprintf "Check if the idx %d is too large:" idx)
+        ; ICmp (Sized (QWORD_PTR, RegOffset (0, RAX)), int64_to_snake_int (Int64.of_int idx))
+        ; CMovle (Reg RSI, Const (Int64.of_int idx))
+        ; IJle (Label assertion_failed_get_index_too_large)
+        ; ILineComment (sprintf "Set the %d-th item from the tuple: " idx)
+        ; IMov (Reg reserved_temp_register_1, compile_imm new_val env)
+        ; IMov (RegOffset (idx + 1, RAX), Reg reserved_temp_register_1)
+        ; IMov (Reg RAX, compile_imm tup env)
+        ]
+    in
+    tag_instructions_with_location code (get_sourcespan tag)
   | CLambda (args, body, tag) ->
     let code, _, _ = compile_lam_helper e env was_typechecked [] [] None in
     code
- | CTryCatch (body, exn, catch, tag) ->
-   let catch_start = sprintf "trycatch_start_%d" (get_int tag) in
-   let catch_end = sprintf "trycatch_end_%d" (get_int tag) in
-   let code = 
-   (* Add this exception handler to the exception handler table before running the body *)
-   compile_native_call "add_to_exn_table" [ compile_exn exn; Label catch_start ]
-   @ compile_aexpr body si env num_args was_typechecked
-   (* After running the body, we stash RAX, clear this exception handler, and restore RAX *)
-   @ [ IMov (Reg reserved_temp_register_1, Reg RAX) ]
-   @ compile_native_call "clear_from_exn_table" [ Label catch_start ]
-   @ [ IMov (Reg RAX, Reg reserved_temp_register_1)
-     (* The body executed without error so jump past the exception handler *)
-     ; IJmp (Label catch_end)
-     ; ILabel catch_start ]
-   (* Before we start executing the exception handler itself, we clear itself from the table
-    * so that exception handlers don't catch exceptions that they themselves throw *) 
-   @ compile_native_call "clear_from_exn_table" [ Label catch_start ]
-   @ compile_aexpr catch si env num_args was_typechecked
-   @ [ ILabel catch_end ] in 
-   tag_instructions_with_location code (get_sourcespan tag)
-
- | CThrow (exn, tag) ->
-   let done_leaving = sprintf "cthrow_done_leaving_%d" (get_int tag) in
-   let loop_start = sprintf "cthrow_loop_start_%d" (get_int tag) in
-   let code = 
-   (* Get the depth of the handler by calling into the runtime *) 
-   compile_native_call "get_exn_depth" [ compile_exn exn ]
-   (* A small assembly gadget to `leave` n times *) 
-   @ [ ILabel loop_start
-     ; ICmp (Reg RAX, Const 0L)
-     ; IJe (Label done_leaving)
-     ; ILeave
-     (* After each leave instruction, we need to decrement the depths of all the handlers
-      * to keep the table of depths up to date. Stash RAX so it doesn't get clobbered. *)
-     ; IMov (Reg reserved_temp_register_1, Reg RAX)]
-   @ compile_native_call "decrement_exn_depths" []
-   @ [ IMov (Reg RAX, Reg reserved_temp_register_1)
-     ; ISub (Reg RAX, Const 1L)
-     ; IJmp (Label loop_start)
-     ; ILabel done_leaving
-     ]
-   (* Once we have left enough stack frames, we're almost ready to jump. But before we can
-    * jump we need to clear all of the exception handlers that we are jumping "over". For 
-    * example, if there are two nested exception handlers and we are jumping to the outer
-    * one, we need to clear the inner one to ensure it is no longer in effect. Since we only
-    * ever append to our list of exception handlers, this can be done simply by clearing
-    * all exception handlers from the end of the list to exn. This code lives in the 
-    * runtime. *) 
-   @ compile_native_call "clear_exn_table_before_jmp" [ compile_exn exn ]
-   (* And then finally, we can just jump straight to the exception handler (aka the
-    * "trycatch_start_%d" label from above) and resume execution directly *) 
-   @ compile_native_call "get_exn_location" [ compile_exn exn ]
-   @ [ IJmp (Reg RAX) ]
-   in tag_instructions_with_location code (get_sourcespan tag)
+  | CTryCatch (body, exn, catch, tag) ->
+    let catch_start = sprintf "trycatch_start_%d" (get_int tag) in
+    let catch_end = sprintf "trycatch_end_%d" (get_int tag) in
+    let code =
+      (* Add this exception handler to the exception handler table before running the body *)
+      compile_native_call "add_to_exn_table" [ compile_exn exn; Label catch_start ]
+      @ compile_aexpr body si env num_args was_typechecked
+      (* After running the body, we stash RAX, clear this exception handler, and restore RAX *)
+      @ [ IMov (Reg reserved_temp_register_1, Reg RAX) ]
+      @ compile_native_call "clear_from_exn_table" [ Label catch_start ]
+      @ [ IMov (Reg RAX, Reg reserved_temp_register_1)
+          (* The body executed without error so jump past the exception handler *)
+        ; IJmp (Label catch_end)
+        ; ILabel catch_start
+        ]
+      (* Before we start executing the exception handler itself, we clear itself from the table
+       * so that exception handlers don't catch exceptions that they themselves throw *)
+      @ compile_native_call "clear_from_exn_table" [ Label catch_start ]
+      @ compile_aexpr catch si env num_args was_typechecked
+      @ [ ILabel catch_end ]
+    in
+    tag_instructions_with_location code (get_sourcespan tag)
+  | CThrow (exn, tag) ->
+    let done_leaving = sprintf "cthrow_done_leaving_%d" (get_int tag) in
+    let loop_start = sprintf "cthrow_loop_start_%d" (get_int tag) in
+    let code =
+      (* Get the depth of the handler by calling into the runtime *)
+      compile_native_call "get_exn_depth" [ compile_exn exn ]
+      (* A small assembly gadget to `leave` n times *)
+      @ [ ILabel loop_start
+        ; ICmp (Reg RAX, Const 0L)
+        ; IJe (Label done_leaving)
+        ; ILeave
+          (* After each leave instruction, we need to decrement the depths of all the handlers
+           * to keep the table of depths up to date. Stash RAX so it doesn't get clobbered. *)
+        ; IMov (Reg reserved_temp_register_1, Reg RAX)
+        ]
+      @ compile_native_call "decrement_exn_depths" []
+      @ [ IMov (Reg RAX, Reg reserved_temp_register_1)
+        ; ISub (Reg RAX, Const 1L)
+        ; IJmp (Label loop_start)
+        ; ILabel done_leaving
+        ]
+      (* Once we have left enough stack frames, we're almost ready to jump. But before we can
+       * jump we need to clear all of the exception handlers that we are jumping "over". For 
+       * example, if there are two nested exception handlers and we are jumping to the outer
+       * one, we need to clear the inner one to ensure it is no longer in effect. Since we only
+       * ever append to our list of exception handlers, this can be done simply by clearing
+       * all exception handlers from the end of the list to exn. This code lives in the 
+       * runtime. *)
+      @ compile_native_call "clear_exn_table_before_jmp" [ compile_exn exn ]
+      (* And then finally, we can just jump straight to the exception handler (aka the
+       * "trycatch_start_%d" label from above) and resume execution directly *)
+      @ compile_native_call "get_exn_location" [ compile_exn exn ]
+      @ [ IJmp (Reg RAX) ]
+    in
+    tag_instructions_with_location code (get_sourcespan tag)
 
 (* Compile the given immexpr to a list of instructions *)
 and compile_imm (e : tag immexpr) (env : arg envt) : arg =
@@ -591,12 +618,13 @@ and compile_imm (e : tag immexpr) (env : arg envt) : arg =
   | ImmId (x, _) -> find env x
   | ImmNil _ -> const_nil
 
-and compile_exn (exn: string) : arg = 
+and compile_exn (exn : string) : arg =
   let rec find x lst =
     match lst with
     | [] -> raise (InternalCompilerError (sprintf "Failed to find exception %s" x))
     | first :: rest -> if x = first then 0 else 1 + find x rest
-  in Const (Int64.of_int (find exn !global_defined_exns))
+  in
+  Const (Int64.of_int (find exn !global_defined_exns))
 
 (* Compile the given cexpr which must be a prim1 to a list of instructions *)
 and compile_prim1 (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (was_typechecked : bool)
@@ -674,7 +702,17 @@ and compile_prim1 (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
     ; IMov (Reg RCX, compile_imm body env)
     ; ICall (Label "print_stack")
     ]
-  | (CIf _ | CPrim2 _ | CApp _ | CImmExpr _ | CSetItem _ | CTuple _ | CGetItem _ | CLambda _ | CString _ | CTryCatch _ | CThrow _) as err ->
+  | ( CIf _
+    | CPrim2 _
+    | CApp _
+    | CImmExpr _
+    | CSetItem _
+    | CTuple _
+    | CGetItem _
+    | CLambda _
+    | CString _
+    | CTryCatch _
+    | CThrow _ ) as err ->
     raise (InternalCompilerError (sprintf "compile_prim1 called on a non-prim1: %s" (string_of_cexpr err)))
 
 (* Compile the given cexpr which must be a prim2 to a list of instructions *)
@@ -694,14 +732,14 @@ and compile_prim2 (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
       | Plus -> [ IAdd (Reg RAX, Reg reserved_temp_register_2) ]
       | Minus -> [ ISub (Reg RAX, Reg reserved_temp_register_2) ]
       | Times -> [ ISar (Reg RAX, Const 1L); IMul (Reg RAX, Reg reserved_temp_register_2) ]
-      | Divides -> [
-        ISar(Reg reserved_temp_register_1, Const 1L);
-        ISar(Reg reserved_temp_register_2, Const 1L);
-        IMov(Reg RAX, Reg reserved_temp_register_1);
-        ICqo;
-        IIDiv(Reg reserved_temp_register_2);
-        IShl(Reg RAX, Const 1L)
-      ]
+      | Divides ->
+        [ ISar (Reg reserved_temp_register_1, Const 1L)
+        ; ISar (Reg reserved_temp_register_2, Const 1L)
+        ; IMov (Reg RAX, Reg reserved_temp_register_1)
+        ; ICqo
+        ; IIDiv (Reg reserved_temp_register_2)
+        ; IShl (Reg RAX, Const 1L)
+        ]
       | err ->
         raise
           (InternalCompilerError
@@ -775,7 +813,17 @@ and compile_prim2 (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
       ; IMov (Reg RAX, const_false)
       ; ILabel cmp_done_label
       ]
-  | (CIf _ | CPrim1 _ | CApp _ | CImmExpr _ | CSetItem _ | CTuple _ | CGetItem _ | CLambda _ | CString _ | CTryCatch _ | CThrow _) as err ->
+  | ( CIf _
+    | CPrim1 _
+    | CApp _
+    | CImmExpr _
+    | CSetItem _
+    | CTuple _
+    | CGetItem _
+    | CLambda _
+    | CString _
+    | CTryCatch _
+    | CThrow _ ) as err ->
     raise (InternalCompilerError (sprintf "compile_prim2 called on a non-prim2: %s" (string_of_cexpr err)))
 
 (* Assert that the given argument is an int. If it is not, jump to the given label which 
@@ -784,23 +832,22 @@ and compile_prim2 (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
  * contexts. Note that if the arg is a Const that is not an int, this does *not* raise a 
  * compile time exception and instead generates assembly to raise a runtime error. *)
 and compile_assert_is_int (v : arg) (error_label : string) (was_typechecked : bool) : instruction list =
- (
-    match v with
-    | RegOffset (_, _) | Reg _ | RegByteOffset _ | RegOffsetReg _ | Label _ | LabelContents _ ->
-      [ ILineComment (sprintf "Assert that %s holds a number" (arg_to_asm v))
-      ; ITest (Sized (QWORD_PTR, v), HexConst num_tag_mask)
-      ; CMovne (Reg RSI, v)
-      ; IJne (Label error_label)
+  match v with
+  | RegOffset (_, _) | Reg _ | RegByteOffset _ | RegOffsetReg _ | Label _ | LabelContents _ ->
+    [ ILineComment (sprintf "Assert that %s holds a number" (arg_to_asm v))
+    ; ITest (Sized (QWORD_PTR, v), HexConst num_tag_mask)
+    ; CMovne (Reg RSI, v)
+    ; IJne (Label error_label)
+    ]
+  | HexConst n | Const n ->
+    if is_snake_int n
+    then []
+    else
+      [ ILineComment (sprintf "A non-int constant was given to a function that expects a number, so throw an error")
+      ; IMov (Reg RSI, v)
+      ; IJmp (Label error_label)
       ]
-    | HexConst n | Const n ->
-      if is_snake_int n
-      then []
-      else
-        [ ILineComment (sprintf "A non-int constant was given to a function that expects a number, so throw an error")
-        ; IMov (Reg RSI, v)
-        ; IJmp (Label error_label)
-        ]
-    | Sized (_, arg) -> compile_assert_is_int arg error_label was_typechecked)
+  | Sized (_, arg) -> compile_assert_is_int arg error_label was_typechecked
 
 and compile_assert_is_bool (v : arg) (error_label : string) (was_typechecked : bool) : instruction list =
   compile_assert_has_tag bool_tag v error_label was_typechecked
@@ -823,28 +870,27 @@ and compile_assert_has_tag (tag : int64) (v : arg) (error_label : string) (was_t
       | t when t = num_tag -> "num"
       | _ -> "unknown"
     in
-    (
-      match v with
-      | RegOffset (_, _) | Reg _ | RegByteOffset _ | RegOffsetReg _ | LabelContents _ | Label _ ->
-        [ ILineComment (sprintf "Assert that %s has the tag %Ld (aka: '%s')" (arg_to_asm v) tag (tag_to_typ tag))
-        ; IMov (Reg reserved_temp_register_1, v)
-        ; IShl (Reg reserved_temp_register_1, Const 61L)
-        ; IShr (Reg reserved_temp_register_1, Const 61L)
-        ; ICmp (Reg reserved_temp_register_1, HexConst tag)
-        ; CMovne (Reg RSI, v)
-        ; IJne (Label error_label)
+    match v with
+    | RegOffset (_, _) | Reg _ | RegByteOffset _ | RegOffsetReg _ | LabelContents _ | Label _ ->
+      [ ILineComment (sprintf "Assert that %s has the tag %Ld (aka: '%s')" (arg_to_asm v) tag (tag_to_typ tag))
+      ; IMov (Reg reserved_temp_register_1, v)
+      ; IShl (Reg reserved_temp_register_1, Const 61L)
+      ; IShr (Reg reserved_temp_register_1, Const 61L)
+      ; ICmp (Reg reserved_temp_register_1, HexConst tag)
+      ; CMovne (Reg RSI, v)
+      ; IJne (Label error_label)
+      ]
+    | HexConst n | Const n ->
+      let is_ok = (tag = num_tag && is_snake_int n) || (tag = bool_tag && is_snake_bool n) in
+      if is_ok
+      then []
+      else
+        [ ILineComment
+            (sprintf "A constant was given to a function that expects a %s, so throw an error" (tag_to_typ tag))
+        ; IMov (Reg RSI, v)
+        ; IJmp (Label error_label)
         ]
-      | HexConst n | Const n ->
-        let is_ok = (tag = num_tag && is_snake_int n) || (tag = bool_tag && is_snake_bool n) in
-        if is_ok
-        then []
-        else
-          [ ILineComment
-              (sprintf "A constant was given to a function that expects a %s, so throw an error" (tag_to_typ tag))
-          ; IMov (Reg RSI, v)
-          ; IJmp (Label error_label)
-          ]
-      | Sized (_, arg) -> compile_assert_has_tag tag arg error_label was_typechecked))
+    | Sized (_, arg) -> compile_assert_has_tag tag arg error_label was_typechecked)
 
 and reserve (size : int64) (tag : tag) =
   let ok = sprintf "memcheck_ok_%d" (get_int tag) in
@@ -932,70 +978,99 @@ and compile_fun_app (e : tag cexpr) (env : arg envt) (was_typechecked : bool) : 
          (sprintf
             "compile_fun_app received an Unknown/Prim CApp, cannot compile this function application: %s"
             (string_of_cexpr e)))
-  | (CTuple _ | CIf _ | CPrim1 _ | CPrim2 _ | CGetItem _ | CSetItem _ | CLambda _ | CImmExpr _ | CString _ | CTryCatch _ | CThrow _) as err ->
+  | ( CTuple _
+    | CIf _
+    | CPrim1 _
+    | CPrim2 _
+    | CGetItem _
+    | CSetItem _
+    | CLambda _
+    | CImmExpr _
+    | CString _
+    | CTryCatch _
+    | CThrow _ ) as err ->
     raise (InternalCompilerError ("compile_fun_app called on a non-CApp: " ^ string_of_cexpr err))
 ;;
 
 let compile_prog (was_typechecked : bool) (anfed : tag aprogram) : string =
   match anfed with
   | AProgram ([], body, tag) ->
-    let externs = ["error"; "native#print"; "print_stack"; "try_gc"; "STACK_BOTTOM"; "STACK_SIZE"; "native#string_len"; "native#string_append"; "native#char_at"; "native#input"; "native#equal"; "HEAP_END"; "add_to_exn_table"; "get_exn_depth"; "get_exn_location"; "clear_from_exn_table"; "clear_exn_table_before_jmp"; "increment_exn_depths"; "decrement_exn_depths"] in 
+    let externs =
+      [ "error"
+      ; "native#print"
+      ; "print_stack"
+      ; "try_gc"
+      ; "STACK_BOTTOM"
+      ; "STACK_SIZE"
+      ; "native#string_len"
+      ; "native#string_append"
+      ; "native#char_at"
+      ; "native#input"
+      ; "native#equal"
+      ; "HEAP_END"
+      ; "add_to_exn_table"
+      ; "get_exn_depth"
+      ; "get_exn_location"
+      ; "clear_from_exn_table"
+      ; "clear_exn_table_before_jmp"
+      ; "increment_exn_depths"
+      ; "decrement_exn_depths"
+      ]
+    in
     let prelude =
-      "section .text\nglobal our_code_starts_here\nglobal EXCEPTION_NAMES\n" ^ String.concat "\n" (List.map (fun (x) -> "extern " ^ x) externs)
+      "section .text\nglobal our_code_starts_here\nglobal EXCEPTION_NAMES\n"
+      ^ String.concat "\n" (List.map (fun x -> "extern " ^ x) externs)
     in
     (* Postlude for our program that contains labels used for error handling *)
     let postlude =
       [ ILeave
       ; IRet
       ; ILineComment "Error labels: "
-      ; 
-          (ILabel assertion_failed_arith_not_num)
+      ; ILabel assertion_failed_arith_not_num
       ; IMov (Reg RDI, Const err_ARITH_NOT_NUM)
       ; ICall (Label "error")
-      ; 
-          (ILabel assertion_failed_comparison_not_num)
+      ; ILabel assertion_failed_comparison_not_num
       ; IMov (Reg RDI, Const err_COMP_NOT_NUM)
       ; ICall (Label "error")
-      ; 
-          (ILabel assertion_failed_if_not_bool)
+      ; ILabel assertion_failed_if_not_bool
       ; IMov (Reg RDI, Const err_IF_NOT_BOOL)
       ; ICall (Label "error")
-      ; 
-          (ILabel assertion_failed_logic_not_bool)
+      ; ILabel assertion_failed_logic_not_bool
       ; IMov (Reg RDI, Const err_LOGIC_NOT_BOOL)
       ; ICall (Label "error")
-      ;  (ILabel overflow_label)
+      ; ILabel overflow_label
       ; IMov (Reg RDI, Const err_OVERFLOW)
       ; ICall (Label "error")
-      ;  (ILabel assertion_failed_not_tuple)
+      ; ILabel assertion_failed_not_tuple
       ; IMov (Reg RDI, Const err_GET_NOT_TUPLE)
       ; ICall (Label "error")
-      ; (ILabel assertion_failed_get_index_too_large)
+      ; ILabel assertion_failed_get_index_too_large
       ; IMov (Reg RDI, Const err_GET_HIGH_INDEX)
       ; ICall (Label "error")
-      ;  (ILabel assertion_failed_get_index_too_small)
+      ; ILabel assertion_failed_get_index_too_small
       ; IMov (Reg RDI, Const err_GET_LOW_INDEX)
       ; ICall (Label "error")
-      ;  (ILabel assertion_failed_index_nil)
+      ; ILabel assertion_failed_index_nil
       ; IMov (Reg RDI, Const err_NIL_DEREF)
       ; ICall (Label "error")
-      ;  (ILabel assertion_failed_no_more_heap_space)
+      ; ILabel assertion_failed_no_more_heap_space
       ; IMov (Reg RDI, Const err_OUT_OF_MEMORY)
       ; ICall (Label "error")
-      ;  (ILabel assertion_failed_not_a_closure)
+      ; ILabel assertion_failed_not_a_closure
       ; IMov (Reg RDI, Const err_CALL_NOT_CLOSURE)
       ; ICall (Label "error")
-      ; 
-          (ILabel assertion_failed_arity_error)
+      ; ILabel assertion_failed_arity_error
       ; IMov (Reg RDI, Const err_CALL_ARITY_ERR)
       ; ICall (Label "error")
-      ; 
-          ( ILabel assertion_failed_out_of_stack_memory)
-         
+      ; ILabel assertion_failed_out_of_stack_memory
       ; IMov (Reg RDI, Const err_OUT_OF_STACK_MEMORY)
       ; ICall (Label "error")
-      ] in 
-    let postlude = (postlude @ List.mapi (fun (i) (e) -> StringConstant ((sprintf "exception_%d" i), e)) !global_defined_exns @ [ArrayConstant("EXCEPTION_NAMES", (List.mapi (fun i _ -> sprintf "exception_%d" i)  !global_defined_exns))]) 
+      ]
+    in
+    let postlude =
+      postlude
+      @ List.mapi (fun i e -> StringConstant (sprintf "exception_%d" i, e)) !global_defined_exns
+      @ [ ArrayConstant ("EXCEPTION_NAMES", List.mapi (fun i _ -> sprintf "exception_%d" i) !global_defined_exns) ]
     in
     let all_instructions =
       [ ILabel "our_code_starts_here" ]
@@ -1005,7 +1080,7 @@ let compile_prog (was_typechecked : bool) (anfed : tag aprogram) : string =
         ; ILineComment "} heap setup"
         ; IInstrComment (IMov (LabelContents "STACK_BOTTOM", Reg RBP), "Init STACK_BOTTOM")
         ]
-      @  (compile_aexpr body 1 [] 0 was_typechecked) 
+      @ compile_aexpr body 1 [] 0 was_typechecked
       @ postlude
     in
     let legal_all_instructions = remove_illegal_immediates all_instructions in
