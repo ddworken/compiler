@@ -1298,6 +1298,7 @@ and compile_cexpr (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
   | CString(s, tag) -> 
   let string_size_on_heap = Int64.of_int (round_up_to_multiple_of_16 (String.length s + 1)) in 
   let explode s = List.init (String.length s) (String.get s) in 
+  let code = 
   [ ILineComment (sprintf "Allocate space for the string '%s' on the heap:" s)]
   @ reserve string_size_on_heap tag 
   @ [ILineComment (sprintf "And put it on the heap:")]
@@ -1309,22 +1310,26 @@ and compile_cexpr (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
       ; IAdd (Reg RAX, HexConst string_tag)
       ; IAdd (Reg reserved_heap_reg, Const string_size_on_heap)
       ]
+      in tag_instructions_with_location code (get_sourcespan tag)
   | CIf (cond, thn, els, tag) ->
     let else_label = sprintf "if_false_%d" (get_int tag) in
     let done_label = sprintf "done_%d" (get_int tag) in
+    let code = 
     [ IMov (Reg RAX, compile_imm cond env) ]
     @ compile_assert_is_bool (Reg RAX) assertion_failed_if_not_bool was_typechecked
     @ [ ICmp (Reg RAX, const_true); IJne (Label else_label) ]
     @ compile_aexpr thn si env num_args was_typechecked
     @ [ IJmp (Label done_label); ILabel else_label ]
     @ compile_aexpr els si env num_args was_typechecked
-    @ [ ILabel done_label ]
-  | CPrim1 _ -> compile_prim1 e si env num_args was_typechecked
-  | CPrim2 _ -> compile_prim2 e si env num_args was_typechecked
+    @ [ ILabel done_label ] in 
+    tag_instructions_with_location code (get_sourcespan tag)
+  | CPrim1 (_, _, tag) -> tag_instructions_with_location (compile_prim1 e si env num_args was_typechecked) (get_sourcespan tag)
+  | CPrim2 (_, _, _, tag) -> tag_instructions_with_location (compile_prim2 e si env num_args was_typechecked) (get_sourcespan tag)
   | CApp _ -> compile_fun_app e env was_typechecked
   | CImmExpr e -> [ IMov (Reg RAX, compile_imm e env) ]
   | CTuple (exprs, tag) ->
     let tuple_size_on_heap = Int64.of_int (round_up_to_multiple_of_16 ((List.length exprs + 1) * 8)) in
+    let code = 
     [ ILineComment (sprintf "Check if we have space on the heap to store our tuple of size %Ld: " tuple_size_on_heap) ]
     @ reserve tuple_size_on_heap tag
     @ [ ILineComment "Creating a tuple: "
@@ -1344,8 +1349,10 @@ and compile_cexpr (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
     @ [ IMov (Reg RAX, Reg reserved_heap_reg)
       ; IAdd (Reg RAX, HexConst tuple_tag)
       ; IAdd (Reg reserved_heap_reg, Const tuple_size_on_heap)
-      ]
+      ] in 
+      tag_instructions_with_location code (get_sourcespan tag)
   | CGetItem (expr, idx, tag) ->
+  let code = 
     [ IMov (Reg RAX, compile_imm expr env) ]
     @ compile_assert_is_tuple (Reg RAX) assertion_failed_not_tuple was_typechecked
     @
@@ -1366,8 +1373,10 @@ and compile_cexpr (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
       ; IJle (Label assertion_failed_get_index_too_large)
       ; ILineComment (sprintf "Get the %d-th item from the tuple: " idx)
       ; IMov (Reg RAX, RegOffset (idx + 1, RAX))
-      ]
+      ] in 
+      tag_instructions_with_location code (get_sourcespan tag)
   | CSetItem (tup, idx, new_val, tag) ->
+  let code = 
     [ IMov (Reg RAX, compile_imm tup env) ]
     @ compile_assert_is_tuple (Reg RAX) assertion_failed_not_tuple was_typechecked
     @
@@ -1390,13 +1399,15 @@ and compile_cexpr (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
       ; IMov (Reg reserved_temp_register_1, compile_imm new_val env)
       ; IMov (RegOffset (idx + 1, RAX), Reg reserved_temp_register_1)
       ; IMov (Reg RAX, compile_imm tup env)
-      ]
+      ] in 
+      tag_instructions_with_location code (get_sourcespan tag)
   | CLambda (args, body, tag) ->
     let code, _, _ = compile_lam_helper e env was_typechecked [] [] None in
     code
  | CTryCatch (body, exn, catch, tag) ->
    let catch_start = sprintf "trycatch_start_%d" (get_int tag) in
    let catch_end = sprintf "trycatch_end_%d" (get_int tag) in
+   let code = 
    (* Add this exception handler to the exception handler table before running the body *)
    compile_native_call "add_to_exn_table" [ compile_exn exn; Label catch_start ]
    @ compile_aexpr body si env num_args was_typechecked
@@ -1411,11 +1422,13 @@ and compile_cexpr (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
     * so that exception handlers don't catch exceptions that they themselves throw *) 
    @ compile_native_call "clear_from_exn_table" [ Label catch_start ]
    @ compile_aexpr catch si env num_args was_typechecked
-   @ [ ILabel catch_end ]
+   @ [ ILabel catch_end ] in 
+   tag_instructions_with_location code (get_sourcespan tag)
 
  | CThrow (exn, tag) ->
    let done_leaving = sprintf "cthrow_done_leaving_%d" (get_int tag) in
    let loop_start = sprintf "cthrow_loop_start_%d" (get_int tag) in
+   let code = 
    (* Get the depth of the handler by calling into the runtime *) 
    compile_native_call "get_exn_depth" [ compile_exn exn ]
    (* A small assembly gadget to `leave` n times *) 
@@ -1444,6 +1457,7 @@ and compile_cexpr (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
     * "trycatch_start_%d" label from above) and resume execution directly *) 
    @ compile_native_call "get_exn_location" [ compile_exn exn ]
    @ [ IJmp (Reg RAX) ]
+   in tag_instructions_with_location code (get_sourcespan tag)
 
 (* Compile the given immexpr to a list of instructions *)
 and compile_imm (e : tag immexpr) (env : arg envt) : arg =
