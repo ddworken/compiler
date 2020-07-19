@@ -1325,7 +1325,7 @@ and compile_cexpr (e : tag cexpr) (si : int) (env : arg envt) (num_args : int) (
     tag_instructions_with_location code (get_sourcespan tag)
   | CPrim1 (_, _, tag) -> tag_instructions_with_location (compile_prim1 e si env num_args was_typechecked) (get_sourcespan tag)
   | CPrim2 (_, _, _, tag) -> tag_instructions_with_location (compile_prim2 e si env num_args was_typechecked) (get_sourcespan tag)
-  | CApp _ -> compile_fun_app e env was_typechecked
+  | CApp (_, _, _, tag) -> tag_instructions_with_location (compile_fun_app e env was_typechecked) (get_sourcespan tag)
   | CImmExpr e -> [ IMov (Reg RAX, compile_imm e env) ]
   | CTuple (exprs, tag) ->
     let tuple_size_on_heap = Int64.of_int (round_up_to_multiple_of_16 ((List.length exprs + 1) * 8)) in
