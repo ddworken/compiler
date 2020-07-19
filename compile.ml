@@ -1882,7 +1882,7 @@ let compile_prog (was_typechecked : bool) (anfed : tag aprogram) : string =
         ; ILineComment "} heap setup"
         ; IInstrComment (IMov (LabelContents "STACK_BOTTOM", Reg RBP), "Init STACK_BOTTOM")
         ]
-      @ tag_instructions_with_location (compile_aexpr body 1 [] 0 was_typechecked) (get_sourcespan tag)
+      @  (compile_aexpr body 1 [] 0 was_typechecked) 
       @ postlude
     in
     let legal_all_instructions = remove_illegal_immediates all_instructions in
