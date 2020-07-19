@@ -2,6 +2,8 @@ open Printf
 open Exprs
 open Pretty
 
+let global_defined_exns: string list ref = ref [] 
+
 exception ParseError of string (* parse-error message *)
 exception UnboundId of string * sourcespan (* name, where used *)
 exception UnboundTyId of string * sourcespan (* name, where used *)
