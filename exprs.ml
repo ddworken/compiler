@@ -32,6 +32,7 @@ type prim2 =
   | Minus
   | Times
   | Divides
+  | Mod 
   | And
   | Or
   | Greater
